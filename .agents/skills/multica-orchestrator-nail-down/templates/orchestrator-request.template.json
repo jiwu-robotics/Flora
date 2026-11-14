@@ -1,0 +1,40 @@
+{
+  "schema": "multica-orchestrator-nail-down.project-binding-request.v6",
+  "project": {"name": "repository-name", "description": ""},
+  "repository": {"project_subpath": "."},
+  "policy": {
+    "execution_mode": "worktree",
+    "work_item_id_source": "multica-issue-key",
+    "runtime_branch_authority": "multica",
+    "integration_branch_authority": "repository-provider",
+    "main_ref": "main",
+    "develop_ref": "develop",
+    "repository_command_profile": "default"
+  },
+  "command_profiles": {
+    "default": {
+      "test": {"command": "project-test-command"},
+      "lint": {"na_policy_ref": "human-approved:lint-na"},
+      "build": {"na_policy_ref": "human-approved:build-na"}
+    }
+  },
+  "runtime_target_policy": {
+    "required_runtimes": [
+      {
+        "runtime_alias": "primary-runtime",
+        "local_directory_required": true,
+        "command_profile": "default",
+        "workload_classes": ["feature", "fix"],
+        "required_capability_revision": "sha256:replace-during-materialization"
+      }
+    ],
+    "optional_runtimes": [],
+    "native_squad_dispatch": {
+      "leader_first": true,
+      "leader_routes_by_exact_member_mention": true,
+      "member_reply_retriggers_leader": true,
+      "issue_assignment_no_start_required": true,
+      "runtime_open_fence_required": true
+    }
+  }
+}

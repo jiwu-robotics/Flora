@@ -1,0 +1,1 @@
+请在当前机器上使用 Multica CLI profile <profile>，通过已授权的 SSH 账号 <ssh-user>（密码仅在原生交互提示中输入）发现并验证 <lan-host> 上的 LAN 自托管 Multica 服务，使用账号 <account> 登录并选择已有 Workspace <workspace>，完成 CLI 与 Workspace readback，但不要启动 Runtime、创建资源或输出任何凭据。

@@ -1,0 +1,4 @@
+interface:
+  display_name: "DataPilot Deploy"
+  short_description: "Build and deploy the latest DataPilot site safely"
+  default_prompt: "Use $datapilot-deploy to build and deploy the latest approved DataPilot code, verify HTTPS and the changed page, and clean up eligible historical release images, their attributable build caches, and temporary deployment resources."

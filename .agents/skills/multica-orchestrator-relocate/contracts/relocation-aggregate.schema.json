@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-relocate.aggregate.v1",
+  "title": "RelocationAggregate.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "plan_digest", "input_digest", "snapshot_digest", "relocation_intent_digest", "foundation_manifest_digest", "server_manifest_digest", "project_receipts", "state", "aggregated_at", "aggregate_digest"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator-relocate.aggregate.v1"},
+    "plan_digest": {"$ref": "#/$defs/digest"},
+    "input_digest": {"$ref": "#/$defs/digest"},
+    "snapshot_digest": {"$ref": "#/$defs/digest"},
+    "relocation_intent_digest": {"$ref": "#/$defs/digest"},
+    "foundation_manifest_digest": {"$ref": "#/$defs/digest"},
+    "server_manifest_digest": {"$ref": "#/$defs/digest"},
+    "project_receipts": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["project_key", "receipt_digest"], "properties": {"project_key": {"$ref": "#/$defs/digest"}, "receipt_digest": {"$ref": "#/$defs/digest"}}}},
+    "state": {"const": "RELEASES_REACTIVATED"},
+    "aggregated_at": {"type": "string", "format": "date-time"},
+    "aggregate_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {"digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}
+}

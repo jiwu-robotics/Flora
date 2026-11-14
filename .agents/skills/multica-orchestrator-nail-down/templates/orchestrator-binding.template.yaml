@@ -1,0 +1,38 @@
+schema_version: "10"
+orchestrator_profile:
+  id: multica-super-individual-orchestration
+  contract_version: "10"
+  manifest_digest: "<sha256>"
+repository:
+  provider: github
+  execution_mode: worktree
+  work_item_id_source: multica-issue-key
+  runtime_branch_authority: multica
+  integration_branch_authority: repository-provider
+  main_ref: main
+  develop_ref: develop
+commands:
+  test:
+    command: "<target-project-command>"
+  lint:
+    command: "<target-project-command-or-remove-and-use-na-policy>"
+  build:
+    command: "<target-project-command-or-remove-and-use-na-policy>"
+paths:
+  project_root: "."
+  constitution: ".specify/memory/constitution.md"
+  architecture: ".specify/memory/architecture.md"
+  feature_root: "specs"
+  fix_root: ".specify/bugs"
+workflow:
+  feature_squad: feature
+  fix_squad: fix
+  default_worktree: true
+  loop_isolation: runtime-worktree
+  native_squad_routing: true
+  leader_first: true
+  exact_member_mentions: true
+  member_reply_retriggers_leader: true
+  runtime_open_fence: true
+  collaboration_runtime: "<runtime-alias>"
+  one_active_writer_per_work_item: true

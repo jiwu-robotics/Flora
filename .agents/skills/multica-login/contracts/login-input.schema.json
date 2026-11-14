@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-login.input.v1",
+  "title": "MulticaLoginInput.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "target_type", "deployment_scope", "server_url", "web_url", "client_kind", "client_location", "profile", "account_ref", "workspace_selector", "execution_requested", "routes", "ssh_owner_path"],
+  "properties": {
+    "schema": {"const": "multica-login.input.v1"},
+    "target_type": {"enum": ["cloud", "self-hosted"]},
+    "deployment_scope": {"enum": ["cloud", "public", "lan", "local"]},
+    "server_url": {"type": "string", "minLength": 1},
+    "web_url": {"type": "string", "minLength": 1},
+    "client_kind": {"enum": ["cli", "desktop"]},
+    "client_location": {"enum": ["browser-host", "remote-server", "remote-machine"]},
+    "profile": {"type": ["string", "null"], "minLength": 1},
+    "account_ref": {"type": "string", "minLength": 1},
+    "workspace_selector": {"oneOf": [
+      {"type": "object", "additionalProperties": false, "required": ["id"], "properties": {"id": {"type": "string", "minLength": 1}}},
+      {"type": "object", "additionalProperties": false, "required": ["name"], "properties": {"name": {"type": "string", "minLength": 1}}},
+      {"type": "object", "additionalProperties": false, "required": ["slug"], "properties": {"slug": {"type": "string", "minLength": 1}}}
+    ]},
+    "execution_requested": {"type": "boolean"},
+    "routes": {"type": "object", "additionalProperties": false, "required": ["http_reachable", "cli_reachable"], "properties": {"http_reachable": {"type": "boolean"}, "cli_reachable": {"type": "boolean"}}},
+    "ssh_owner_path": {"type": "boolean"}
+  }
+}

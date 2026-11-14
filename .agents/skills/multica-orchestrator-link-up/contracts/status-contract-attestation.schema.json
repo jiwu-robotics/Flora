@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-link-up.status-contract-attestation.v1",
+  "title": "Human Web status-contract attestation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "workspace_ref", "actor_member_ref", "observed_at", "statuses"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator-link-up.status-contract-attestation.v1"},
+    "workspace_ref": {"type": "string", "minLength": 1},
+    "actor_member_ref": {"type": "string", "minLength": 1},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "statuses": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["needs_triage", "needs_information", "ready_for_agent", "ready_for_human", "wontfix"],
+      "properties": {
+        "needs_triage": {"$ref": "#/$defs/status"},
+        "needs_information": {"$ref": "#/$defs/status"},
+        "ready_for_agent": {"$ref": "#/$defs/status"},
+        "ready_for_human": {"$ref": "#/$defs/status"},
+        "wontfix": {"$ref": "#/$defs/status"}
+      }
+    }
+  },
+  "$defs": {
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["display_name", "category"],
+      "properties": {
+        "display_name": {"type": "string", "minLength": 1},
+        "category": {"enum": ["backlog", "blocked", "todo", "cancelled"]}
+      }
+    }
+  }
+}

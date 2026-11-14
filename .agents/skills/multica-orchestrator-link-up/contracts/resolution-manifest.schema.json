@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator.foundation-resolution-manifest.v2",
+  "title": "FoundationResolutionManifest.v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "run_id", "profile_ref", "request_digest", "resolved_input", "resolved_input_digest", "fields"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator.foundation-resolution-manifest.v2"},
+    "run_id": {"type": "string", "minLength": 1},
+    "profile_ref": {"type": "string", "minLength": 1},
+    "request_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "resolved_input": {"type": "string", "pattern": "^/"},
+    "resolved_input_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "fields": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["source"],
+        "properties": {"source": {"type": "string"}, "evidence": {"type": "string"}, "value": {}}
+      }
+    }
+  }
+}

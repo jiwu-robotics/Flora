@@ -51,6 +51,8 @@ represent production throughput.
 Both `tempseg/` and `captioner/` contain the complete segmentation-to-caption
 workflow. The annotation examples below use `captioner/`.
 
+For Docker Compose setup, model cache mounts, and image publishing, see [docker/README.md](docker/README.md).
+
 ## Quick start
 
 ```bash

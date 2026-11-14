@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-migrate.operation-receipt.v1",
+  "title": "MigrationOperationReceipt.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "plan_digest", "operation", "runtime_alias", "authorization_ref", "state", "postcondition_digest", "completed_at"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator-migrate.operation-receipt.v1"},
+    "plan_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "operation": {"type": "string", "minLength": 1},
+    "runtime_alias": {"type": "string", "minLength": 1},
+    "authorization_ref": {"type": "string", "minLength": 1},
+    "state": {"enum": ["APPLIED", "ALREADY_APPLIED"]},
+    "postcondition_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "completed_at": {"type": "string", "format": "date-time"}
+  }
+}

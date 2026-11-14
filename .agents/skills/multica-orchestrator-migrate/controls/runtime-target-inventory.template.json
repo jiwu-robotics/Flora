@@ -1,0 +1,12 @@
+{
+  "schema": "multica-orchestrator.runtime-target-inventory.v1",
+  "name": "runtime-targets",
+  "targets": {
+    "primary-runtime": {
+      "ssh_config_host": "runtime-host",
+      "consumer_profile": "runtime-profile",
+      "target_state_root": "/private/multica-state",
+      "repository_root_template": "/private/repositories"
+    }
+  }
+}

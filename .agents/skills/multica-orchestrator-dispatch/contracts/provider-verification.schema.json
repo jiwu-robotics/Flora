@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-dispatch.provider-verification.v2",
+  "title": "ProviderVerification.v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "state", "repository", "pull_request", "source_head", "target_head_before_merge", "merge_head", "checks_revision", "required_checks", "provider_evidence_digest", "verification_digest"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator-dispatch.provider-verification.v2"},
+    "state": {"const": "VERIFIED"},
+    "repository": {"type": "string", "minLength": 1},
+    "pull_request": {"type": "integer", "minimum": 1},
+    "source_head": {"$ref": "#/$defs/revision"},
+    "target_head_before_merge": {"$ref": "#/$defs/revision"},
+    "merge_head": {"$ref": "#/$defs/revision"},
+    "checks_revision": {"$ref": "#/$defs/revision"},
+    "required_checks": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true},
+    "provider_evidence_digest": {"$ref": "#/$defs/digest"},
+    "verification_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

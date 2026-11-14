@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator.project-reissue-spec.v3",
+  "title": "Portable Project reissue specification v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "project_key",
+    "repository_identity",
+    "project_subpath",
+    "repository_policy",
+    "command_profiles",
+    "runtime_target_policy",
+    "repository_configuration",
+    "spec_digest",
+    "dispatch_contract_digest"
+  ],
+  "properties": {
+    "schema": {
+      "const": "multica-orchestrator.project-reissue-spec.v3"
+    },
+    "project_key": {
+      "$ref": "#/$defs/digest"
+    },
+    "repository_identity": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_subpath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repository_policy": {
+      "type": "object"
+    },
+    "command_profiles": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "runtime_target_policy": {
+      "type": "object"
+    },
+    "repository_configuration": {
+      "type": "object"
+    },
+    "spec_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "dispatch_contract_digest": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

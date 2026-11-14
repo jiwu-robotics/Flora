@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator.handoff-bundle.v2",
+  "title": "Portable parent-linked Multica Handoff Bundle v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "stage", "parents", "artifacts", "produced_at"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator.handoff-bundle.v2"},
+    "stage": {"enum": ["workspace-foundation", "server-orchestration", "project-binding"]},
+    "parents": {
+      "type": "array",
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["stage", "manifest_digest"],
+        "properties": {
+          "stage": {"enum": ["workspace-foundation", "server-orchestration"]},
+          "manifest_digest": {"pattern": "^sha256:[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 3,
+      "properties": {
+        "workspace-foundation": {"$ref": "#/$defs/artifact"},
+        "server-orchestration": {"$ref": "#/$defs/artifact"},
+        "server-verification-spec": {"$ref": "#/$defs/artifact"},
+        "project-binding": {"$ref": "#/$defs/artifact"},
+        "runtime-target-policy": {"$ref": "#/$defs/artifact"},
+        "project-verification-spec": {"$ref": "#/$defs/artifact"}
+      },
+      "additionalProperties": false
+    },
+    "produced_at": {"type": "string", "format": "date-time"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"stage": {"const": "workspace-foundation"}}},
+      "then": {
+        "properties": {
+          "parents": {"maxItems": 0},
+          "artifacts": {"required": ["workspace-foundation"], "minProperties": 1, "maxProperties": 1}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"stage": {"const": "server-orchestration"}}},
+      "then": {
+        "properties": {
+          "parents": {"prefixItems": [{"properties": {"stage": {"const": "workspace-foundation"}}}]},
+          "artifacts": {"required": ["server-orchestration", "server-verification-spec"], "minProperties": 2, "maxProperties": 2}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"stage": {"const": "project-binding"}}},
+      "then": {
+        "properties": {
+          "parents": {"prefixItems": [{"properties": {"stage": {"const": "server-orchestration"}}}]},
+          "artifacts": {"required": ["project-binding", "runtime-target-policy", "project-verification-spec"], "minProperties": 3, "maxProperties": 3}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "schema", "media_type", "digest"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^artifacts/[a-z0-9-]+\\.json$"},
+        "schema": {"type": "string", "minLength": 1},
+        "media_type": {"const": "application/json"},
+        "digest": {"pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

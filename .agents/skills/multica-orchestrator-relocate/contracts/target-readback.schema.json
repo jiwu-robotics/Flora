@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-relocate.target-readback.v2",
+  "title": "TargetReadback.v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "server", "workspace_ref", "identity_sets", "runtime_aliases", "runtime_state", "dispatch_quiesced", "active_executions", "active_leases", "integration_operations", "evidence", "mutation_barrier", "observed_at", "readback_digest"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator-relocate.target-readback.v2"},
+    "server": {"type": "object", "additionalProperties": false, "required": ["kind", "ref"], "properties": {"kind": {"enum": ["cloud", "self-hosted"]}, "ref": {"type": "string", "minLength": 1}}},
+    "workspace_ref": {"type": "string", "minLength": 1},
+    "identity_sets": {"$ref": "#/$defs/identitySets"},
+    "runtime_aliases": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "runtime_state": {"enum": ["RUNTIMES_READY", "RUNTIMES_NOT_READY"]},
+    "dispatch_quiesced": {"type": "boolean"},
+    "active_executions": {"type": "integer", "minimum": 0},
+    "active_leases": {"type": "integer", "minimum": 0},
+    "integration_operations": {"type": "integer", "minimum": 0},
+    "evidence": {"type": "object", "additionalProperties": false, "required": ["service_snapshot", "control_snapshot"], "properties": {"service_snapshot": {"$ref": "#/$defs/evidence"}, "control_snapshot": {"$ref": "#/$defs/evidence"}}},
+    "mutation_barrier": {"$ref": "#/$defs/barrier"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "readback_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "identitySets": {"type": "object", "additionalProperties": false, "required": ["workspace_digest", "project_set_digest", "orchestrator_resource_digest", "runtime_fleet_membership_digest"], "properties": {"workspace_digest": {"$ref": "#/$defs/digest"}, "project_set_digest": {"$ref": "#/$defs/digest"}, "orchestrator_resource_digest": {"$ref": "#/$defs/digest"}, "runtime_fleet_membership_digest": {"$ref": "#/$defs/digest"}}},
+    "evidence": {"type": "object", "additionalProperties": false, "required": ["path", "digest"], "properties": {"path": {"type": "string", "pattern": "^/"}, "digest": {"$ref": "#/$defs/digest"}}},
+    "barrier": {"type": "object", "additionalProperties": false, "required": ["sequence", "journal_count", "journal_digest"], "properties": {"sequence": {"type": "integer", "minimum": 0}, "journal_count": {"type": "integer", "minimum": 0}, "journal_digest": {"$ref": "#/$defs/digest"}}}
+  }
+}

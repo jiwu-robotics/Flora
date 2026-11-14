@@ -1,0 +1,5 @@
+interface:
+  display_name: "Multica Orchestrator Dispatch"
+  short_description: "Admit and control one Project Work Item execution"
+policy:
+  allow_implicit_invocation: false

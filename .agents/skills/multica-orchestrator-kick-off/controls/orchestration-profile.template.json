@@ -1,0 +1,13 @@
+{
+  "schema": "multica-orchestrator.orchestration-profile.v1",
+  "name": "default",
+  "collaboration_runtime_alias": "primary-runtime",
+  "defaults": {
+    "model": "<model>",
+    "thinking_level": null,
+    "max_concurrent_tasks": 1,
+    "permission_mode": "private"
+  },
+  "model_groups": {},
+  "roles": {}
+}

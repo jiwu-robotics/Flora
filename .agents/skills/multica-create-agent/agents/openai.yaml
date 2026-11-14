@@ -1,0 +1,5 @@
+interface:
+  display_name: "Multica Create Agent"
+  short_description: "Create an agent from a selected network Skill"
+policy:
+  allow_implicit_invocation: false

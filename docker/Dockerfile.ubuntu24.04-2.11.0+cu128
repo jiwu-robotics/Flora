@@ -1,0 +1,156 @@
+# syntax=docker/dockerfile:1
+FROM docker.m.daocloud.io/nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04
+
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG NO_PROXY
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Common build, network, Python, image and video dependencies for inference.
+ARG UBUNTU_MIRROR=https://mirrors.aliyun.com/ubuntu
+RUN sed -i \
+        -e "s|http://archive.ubuntu.com/ubuntu|${UBUNTU_MIRROR}|g" \
+        -e "s|http://security.ubuntu.com/ubuntu|${UBUNTU_MIRROR}|g" \
+        /etc/apt/sources.list.d/ubuntu.sources \
+    && apt-get update \
+    && apt-get install --yes --no-install-recommends \
+        build-essential ca-certificates cmake curl ffmpeg file git \
+        iproute2 iputils-ping less libffi-dev libgl1 libglib2.0-0 libgomp1 \
+        libsm6 libssl-dev libxext6 libxrender1 locales ninja-build openssh-client \
+        pkg-config python3 python3-dev python3-pip python3-venv rsync unzip vim wget zip \
+    && rm -rf /var/lib/apt/lists/*
+
+# BASH_ENV makes nvm available to non-interactive shells as well as build steps.
+ENV NVM_DIR=/opt/nvm \
+    BASH_ENV=/etc/profile.d/nvm.sh
+ARG NVM_VERSION=v0.40.6
+ARG NODE_VERSION=24.19.0
+RUN mkdir -p "${NVM_DIR}" \
+    && touch "${BASH_ENV}" \
+    && curl --fail --silent --show-error --location \
+        "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh" \
+        | PROFILE="${BASH_ENV}" NVM_DIR="${NVM_DIR}" bash \
+    && . "${BASH_ENV}" \
+    && nvm install -b "${NODE_VERSION}" \
+    && nvm alias default "${NODE_VERSION}" \
+    && for executable in node npm npx; do \
+        ln -s "${NVM_DIR}/versions/node/v${NODE_VERSION}/bin/${executable}" "/usr/local/bin/${executable}"; \
+    done \
+    && nvm cache clear \
+    && printf '%s\n' '[ -r /etc/profile.d/nvm.sh ] && . /etc/profile.d/nvm.sh' >> /etc/bash.bashrc
+
+RUN curl --fail --silent --show-error --location https://astral.sh/uv/0.13.0/install.sh \
+    | env UV_UNMANAGED_INSTALL=/usr/local/bin sh
+
+# Keep the interpreter isolated from Ubuntu's externally managed Python.
+ARG UV_DEFAULT_INDEX=https://mirrors.aliyun.com/pypi/simple/
+ARG UV_CONCURRENT_DOWNLOADS=4
+ENV UV_DEFAULT_INDEX=${UV_DEFAULT_INDEX} \
+    PIP_INDEX_URL=${UV_DEFAULT_INDEX} \
+    UV_CONCURRENT_DOWNLOADS=${UV_CONCURRENT_DOWNLOADS} \
+    UV_HTTP_TIMEOUT=600 \
+    VIRTUAL_ENV=/opt/inference-venv
+RUN uv venv --python /usr/bin/python3 --seed "${VIRTUAL_ENV}"
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+
+# Pin the complete validated dependency graph; PyTorch hosts its CUDA wheels
+# separately from the default Python package index.
+RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked <<'REQUIREMENTS'
+set -e
+export NO_PROXY="${NO_PROXY:+${NO_PROXY},}pypi.nvidia.com,pypi.nvidia.cn,developer.download.nvidia.com,download.pytorch.org,download-r2.pytorch.org"
+export no_proxy="${NO_PROXY}"
+cat > /tmp/inference-requirements.txt <<'PINS'
+--find-links https://download.pytorch.org/whl/cu128/torch/
+--find-links https://download.pytorch.org/whl/cu128/torchvision/
+--find-links https://download.pytorch.org/whl/cu128/torchaudio/
+--find-links https://download.pytorch.org/whl/cu128/nvidia-cublas-cu12/
+--find-links https://download.pytorch.org/whl/cu128/nvidia-cudnn-cu12/
+--find-links https://download.pytorch.org/whl/cu128/nvidia-cusolver-cu12/
+--find-links https://download.pytorch.org/whl/cu128/nvidia-cusparselt-cu12/
+--find-links https://download.pytorch.org/whl/cu128/nvidia-nccl-cu12/
+--find-links https://download.pytorch.org/whl/cu128/nvidia-curand-cu12/
+--find-links https://download.pytorch.org/whl/cu128/nvidia-cusparse-cu12/
+--find-links https://download.pytorch.org/whl/cu128/nvidia-cufft-cu12/
+--find-links https://download.pytorch.org/whl/cu128/nvidia-nvshmem-cu12/
+--find-links https://download.pytorch.org/whl/cu128/nvidia-cuda-nvrtc-cu12/
+--find-links https://download.pytorch.org/whl/cu128/nvidia-cuda-cupti-cu12/
+--find-links https://download.pytorch.org/whl/cu128/nvidia-nvjitlink-cu12/
+--find-links https://download.pytorch.org/whl/cu128/nvidia-cuda-runtime-cu12/
+coloredlogs==15.0.1
+cuda-bindings==12.9.10
+cuda-pathfinder==1.8.6
+cuda-toolkit==12.8.1
+filelock==4.2.10
+flatbuffers==25.12.19
+fsspec==2026.9.0
+humanfriendly==10.0
+jinja2==3.1.6
+markupsafe==3.0.4
+mpmath==1.3.0
+networkx==3.7
+numpy==2.2.6
+nvidia-cublas-cu12==12.8.4.1
+nvidia-cuda-cupti-cu12==12.8.90
+nvidia-cuda-nvrtc-cu12==12.8.93
+nvidia-cuda-runtime-cu12==12.8.90
+nvidia-cudnn-cu12==9.19.0.56
+nvidia-cufft-cu12==11.3.3.83
+nvidia-cufile-cu12==1.13.1.3
+nvidia-curand-cu12==10.3.9.90
+nvidia-cusolver-cu12==11.7.3.90
+nvidia-cusparse-cu12==12.5.8.93
+nvidia-cusparselt-cu12==0.7.1
+nvidia-nccl-cu12==2.28.9
+nvidia-nvjitlink-cu12==12.8.93
+nvidia-nvshmem-cu12==3.4.5
+nvidia-nvtx-cu12==12.8.90
+onnx==1.17.0
+onnxruntime-gpu==1.22.0
+opencv-python-headless==4.11.0.86
+packaging==26.3
+pillow==12.3.0
+protobuf==7.36.2
+safetensors==0.8.0
+scipy==1.15.3
+setuptools==81.0.0
+sympy==1.14.0
+tensorrt-cu12==10.15.1.29
+tensorrt-cu12-bindings==10.15.1.29
+tensorrt-cu12-libs==10.15.1.29
+torch==2.11.0+cu128
+torchaudio==2.11.0+cu128
+torchvision==0.26.0+cu128
+triton==3.6.0
+typing-extensions==4.16.0
+PINS
+uv pip install --python "${VIRTUAL_ENV}/bin/python" -r /tmp/inference-requirements.txt
+uv pip check --python "${VIRTUAL_ENV}/bin/python"
+rm /tmp/inference-requirements.txt
+REQUIREMENTS
+
+# ONNX Runtime loads TensorRT as a plugin; its wheel libraries must be visible
+# to the system linker even when users do not import torch or tensorrt first.
+RUN printf '%s\n' "${VIRTUAL_ENV}/lib/python3.12/site-packages/tensorrt_libs" \
+        > /etc/ld.so.conf.d/inference.conf \
+    && find "${VIRTUAL_ENV}/lib/python3.12/site-packages/nvidia" \
+        -mindepth 2 -maxdepth 2 -type d -name lib >> /etc/ld.so.conf.d/inference.conf \
+    && ldconfig
+
+# Install the annotation environment separately from Rewarder's incompatible
+# dependencies. Copy dependency files first to keep this layer cacheable.
+WORKDIR /app
+COPY captioner/batch_utils/requirements.txt captioner/batch_utils/requirements.txt
+COPY requirements/dev.txt requirements/dev.txt
+RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
+    uv pip install --python "${VIRTUAL_ENV}/bin/python" -r requirements/dev.txt \
+    && uv pip check --python "${VIRTUAL_ENV}/bin/python"
+
+COPY captioner/ captioner/
+COPY docker/download_tempseg.py docker/download_tempseg.py
+COPY LICENSE LICENSE
+ENV FLORA_MODEL_CACHE=/model_zoo/flora/models \
+    HF_HOME=/model_zoo/huggingface \
+    PYTHONUNBUFFERED=1
+CMD ["python", "captioner/tempseg_infer.py", "--help"]

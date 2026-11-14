@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-link-up.workspace-foundation-ref.v6",
+  "title": "WorkspaceFoundationRef.v6",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "server_ref", "server_kind", "deployment_key", "workspace_key", "relocation_intent_digest", "producer_session", "workspace_ref", "labels", "status_contract", "runtime_fleet", "orchestration_capabilities", "state", "dispatch_state", "blockers", "readback_snapshot_digest", "produced_at"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator-link-up.workspace-foundation-ref.v6"},
+    "server_ref": {"type": "string", "minLength": 1},
+    "server_kind": {"enum": ["cloud", "self-hosted"]},
+    "deployment_key": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "workspace_key": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "relocation_intent_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+    "producer_session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_ref", "authenticated_account_ref"],
+      "properties": {
+        "profile_ref": {"type": "string", "minLength": 1},
+        "authenticated_account_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "workspace_ref": {"type": ["string", "null"]},
+    "labels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bug", "enhancement"],
+      "properties": {
+        "bug": {"$ref": "#/$defs/label"},
+        "enhancement": {"$ref": "#/$defs/label"}
+      }
+    },
+    "status_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "evidence_refs"],
+      "properties": {
+        "state": {"enum": ["VERIFIED", "HUMAN_CONFIRMATION_REQUIRED"]},
+        "evidence_refs": {"type": "object"}
+      }
+    },
+    "runtime_fleet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["membership_digest", "runtimes"],
+      "properties": {
+        "membership_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+        "runtimes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/runtime"}
+        }
+      }
+    },
+    "orchestration_capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "evidence_ref", "native_squad_routing"],
+      "properties": {
+        "state": {"enum": ["VERIFIED", "BLOCKED"]},
+        "evidence_ref": {"type": "string", "minLength": 1},
+        "native_squad_routing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["leader_first_surface", "exact_member_routing_surface", "no_start_assignment_surface", "thread_reply_surface", "run_readback_surface", "membership_role_surface", "private_agent_surface"],
+          "properties": {
+            "leader_first_surface": {"type": "boolean"},
+            "exact_member_routing_surface": {"type": "boolean"},
+            "no_start_assignment_surface": {"type": "boolean"},
+            "thread_reply_surface": {"type": "boolean"},
+            "run_readback_surface": {"type": "boolean"},
+            "membership_role_surface": {"type": "boolean"},
+            "private_agent_surface": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "state": {"enum": ["WORKSPACE_FOUNDATION_VERIFIED", "PARTIAL", "BLOCKED"]},
+    "dispatch_state": {"const": "BLOCKED_ORCHESTRATOR_LAYER"},
+    "blockers": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "readback_snapshot_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "produced_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "label": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "color"],
+      "properties": {
+        "ref": {"type": ["string", "null"]},
+        "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$"}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alias", "runtime_ref", "daemon_ref", "status", "provider", "capability_revision"],
+      "properties": {
+        "alias": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"},
+        "runtime_ref": {"type": ["string", "null"]},
+        "daemon_ref": {"type": ["string", "null"]},
+        "status": {"enum": ["online", "offline", "missing"]},
+        "provider": {"type": ["string", "null"]},
+        "capability_revision": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

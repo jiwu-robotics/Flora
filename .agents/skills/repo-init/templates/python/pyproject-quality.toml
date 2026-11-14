@@ -1,0 +1,20 @@
+# Render testpaths and include from the target repository's discovered roots.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.pyright]
+include = ["src", "tests"]
+typeCheckingMode = "basic"
+
+[tool.commitizen]
+name = "cz_customize"
+version = "0.0.0"
+tag_format = "v$version"
+update_changelog_on_bump = false
+
+[tool.commitizen.customize]
+example = "feat(api): add health endpoint\n\n- Return the service health state."
+schema = "<type>(<scope>)[!]: <description>, followed by at least one detail"
+schema_pattern = "^(?:feat|fix|docs|style|refactor|test|build|ci|chore|perf|revert)\\((?:[a-z]|[0-9])+(?:-(?:[a-z]|[0-9])+)*\\)(?:!)?: \\S[^\\r\\n]{0,71}\\n\\n- \\S(?:(?!\\\\n)[^\\r\\n])*(?:\\n- \\S(?:(?!\\\\n)[^\\r\\n])*)*\\n?$"

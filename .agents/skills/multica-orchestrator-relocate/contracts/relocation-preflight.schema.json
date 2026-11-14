@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-relocate.preflight.v3",
+  "title": "RelocationPreflight.v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "input_digest",
+    "migration_receipt_digest",
+    "old_graph",
+    "target_identity_sets",
+    "target_readback_digest",
+    "target_readback_observed_at",
+    "projects",
+    "runtime_aliases",
+    "dispatch_quiesced",
+    "mutation_barrier",
+    "observed_at",
+    "snapshot_digest"
+  ],
+  "properties": {
+    "schema": {
+      "const": "multica-orchestrator-relocate.preflight.v3"
+    },
+    "input_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "migration_receipt_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "old_graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "foundation_manifest_digest",
+        "server_manifest_digest"
+      ],
+      "properties": {
+        "foundation_manifest_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "server_manifest_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "target_readback_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "target_readback_observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "target_identity_sets": {
+      "$ref": "#/$defs/identitySets"
+    },
+    "projects": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/project"
+      }
+    },
+    "runtime_aliases": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "dispatch_quiesced": {
+      "const": true
+    },
+    "mutation_barrier": {
+      "$ref": "#/$defs/barrier"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "snapshot_digest": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "barrier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "journal_count",
+        "journal_digest"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "journal_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "journal_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "identitySets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspace_digest",
+        "project_set_digest",
+        "orchestrator_resource_digest",
+        "runtime_fleet_membership_digest"
+      ],
+      "properties": {
+        "workspace_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "project_set_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "orchestrator_resource_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "runtime_fleet_membership_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_identity",
+        "project_subpath",
+        "old_project_key",
+        "new_project_key",
+        "old_project_bundle_manifest_digest",
+        "old_active_release_digest",
+        "required_runtime_aliases"
+      ],
+      "properties": {
+        "repository_identity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "project_subpath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "old_project_key": {
+          "$ref": "#/$defs/digest"
+        },
+        "new_project_key": {
+          "$ref": "#/$defs/digest"
+        },
+        "old_project_bundle_manifest_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "old_active_release_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "required_runtime_aliases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

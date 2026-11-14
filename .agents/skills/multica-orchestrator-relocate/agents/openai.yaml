@@ -1,0 +1,6 @@
+interface:
+  display_name: "Multica Orchestrator Relocate"
+  short_description: "Rebind orchestrator state after server migration"
+  default_prompt: "Use $multica-orchestrator-relocate to verify a completed server migration and rebind the complete orchestrator state graph without dispatching work."
+policy:
+  allow_implicit_invocation: false

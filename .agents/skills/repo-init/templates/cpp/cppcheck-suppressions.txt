@@ -1,0 +1,2 @@
+# Add narrowly scoped, documented cppcheck suppressions here when a verified
+# false positive cannot be resolved in source. No project-wide suppressions.

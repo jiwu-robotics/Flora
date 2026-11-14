@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+"$id": "multica-orchestrator.candidate-pointer.v2",
+"title": "CandidatePointer.v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "project_key", "project_bundle_manifest_digest", "release_candidate_path", "release_candidate_digest", "repository_identity", "project_subpath", "generation", "previous_release_digest", "updated_at"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator.candidate-pointer.v2"},
+    "project_key": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "project_bundle_manifest_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "release_candidate_path": {"type": "string", "pattern": "^/"},
+    "release_candidate_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "repository_identity": {"type": "string", "pattern": "^github:[^/]+/[^/]+$"},
+    "project_subpath": {"type": "string", "minLength": 1},
+    "generation": {"type": "integer", "minimum": 1},
+    "previous_release_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+    "updated_at": {"type": "string", "format": "date-time"}
+  }
+}

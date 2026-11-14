@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator.active-project-release.v2",
+  "title": "ActiveProjectRelease.v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "deployment_key",
+    "relocation_intent_digest",
+    "project_key",
+    "generation",
+    "release_candidate_digest",
+    "project_bundle_manifest_digest",
+    "project_binding_digest",
+    "runtime_capability_digest",
+    "dispatch_contract_digest",
+    "native_squad_dispatch_digest",
+    "activation_aggregate_digest",
+    "previous_release_digest",
+    "predecessor",
+    "authorization_ref",
+    "state",
+    "activated_at",
+    "release_digest"
+  ],
+  "properties": {
+    "schema": {
+      "const": "multica-orchestrator.active-project-release.v2"
+    },
+    "deployment_key": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "relocation_intent_digest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "project_key": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "release_candidate_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "project_bundle_manifest_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "native_squad_dispatch_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "activation_aggregate_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "previous_release_digest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "authorization_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "const": "ACTIVE"
+    },
+    "predecessor": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "relation",
+        "project_key",
+        "release_digest"
+      ],
+      "properties": {
+        "relation": {
+          "const": "server-relocation"
+        },
+        "project_key": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "release_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "activated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "release_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "project_binding_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "runtime_capability_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "dispatch_contract_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

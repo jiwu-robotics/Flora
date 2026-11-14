@@ -1,0 +1,26 @@
+# LAN/VPN-only overlay for two explicitly authorized host interfaces.
+# Set both variables before running Compose. Do not use 0.0.0.0.
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    depends_on:
+      backend:
+        condition: service_started
+      frontend:
+        condition: service_started
+    ports:
+      - "${CADDY_LAN_BIND_IP:?Set CADDY_LAN_BIND_IP}:80:80"
+      - "${CADDY_VPN_BIND_IP:?Set CADDY_VPN_BIND_IP}:80:80"
+      - "${CADDY_LAN_BIND_IP:?Set CADDY_LAN_BIND_IP}:443:443"
+      - "${CADDY_VPN_BIND_IP:?Set CADDY_VPN_BIND_IP}:443:443"
+      - "${CADDY_LAN_BIND_IP:?Set CADDY_LAN_BIND_IP}:443:443/udp"
+      - "${CADDY_VPN_BIND_IP:?Set CADDY_VPN_BIND_IP}:443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

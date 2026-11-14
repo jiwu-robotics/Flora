@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-dispatch.run-admission-ref.v1",
+  "title": "RunAdmissionRef.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "admission_ref", "execution_ref", "project_key", "project_ref", "repository_ref", "active_release_digest", "project_binding_digest", "dispatch_contract_digest", "runtime_alias", "work_item_ref", "work_item_id", "work_type", "squad_ref", "leader_ref", "epoch", "state", "created_at", "admission_digest"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator-dispatch.run-admission-ref.v1"},
+    "admission_ref": {"type": "string", "minLength": 1},
+    "execution_ref": {"type": "string", "minLength": 1},
+    "project_key": {"$ref": "#/$defs/digest"},
+    "project_ref": {"type": "string", "minLength": 1},
+    "repository_ref": {"type": "string", "minLength": 1},
+    "active_release_digest": {"$ref": "#/$defs/digest"},
+    "project_binding_digest": {"$ref": "#/$defs/digest"},
+    "runtime_alias": {"type": "string", "minLength": 1},
+    "dispatch_contract_digest": {"$ref": "#/$defs/digest"},
+    "work_item_ref": {"type": "string", "format": "uuid"},
+    "work_item_id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*-[0-9]+$"},
+    "work_item_url": {"type": ["string", "null"]},
+    "work_type": {"enum": ["feature", "fix"]},
+    "squad_ref": {"type": "string", "minLength": 1},
+    "leader_ref": {"type": "string", "minLength": 1},
+    "epoch": {"type": "integer", "minimum": 1},
+    "state": {"const": "ACTIVE"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "admission_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {"digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}
+}

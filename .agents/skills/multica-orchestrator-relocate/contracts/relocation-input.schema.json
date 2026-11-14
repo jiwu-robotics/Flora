@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-relocate.input.v2",
+  "title": "RelocationInput.v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "state_root", "source_index", "target_inventory", "target_profile", "deployment_key", "migration_receipt", "workspace_ref", "old_server", "target_server", "old_workspace_key", "new_workspace_key", "project_scope", "project_selectors", "created_at", "input_digest"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator-relocate.input.v2"},
+    "state_root": {"type": "string", "pattern": "^/"},
+    "source_index": {"$ref": "#/$defs/fileRef"},
+    "target_inventory": {"$ref": "#/$defs/fileRef"},
+    "target_profile": {"type": "string", "minLength": 1},
+    "deployment_key": {"$ref": "#/$defs/digest"},
+    "migration_receipt": {"$ref": "#/$defs/fileRef"},
+    "workspace_ref": {"type": "string", "minLength": 1},
+    "old_server": {"$ref": "#/$defs/server"},
+    "target_server": {"$ref": "#/$defs/server"},
+    "old_workspace_key": {"$ref": "#/$defs/digest"},
+    "new_workspace_key": {"$ref": "#/$defs/digest"},
+    "project_scope": {"enum": ["all", "explicit", "explicitly-empty"]},
+    "project_selectors": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["repository_identity", "project_subpath"],
+        "properties": {
+          "repository_identity": {"type": "string", "pattern": "^github:[^/\\s]+/[^/\\s]+$"},
+          "project_subpath": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "created_at": {"type": "string", "format": "date-time"},
+    "input_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "server": {"type": "object", "additionalProperties": false, "required": ["kind", "ref"], "properties": {"kind": {"enum": ["cloud", "self-hosted"]}, "ref": {"type": "string", "minLength": 1}}},
+    "fileRef": {"type": "object", "additionalProperties": false, "required": ["path", "digest"], "properties": {"path": {"type": "string", "pattern": "^/"}, "digest": {"$ref": "#/$defs/digest"}}}
+  }
+}

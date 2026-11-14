@@ -1,0 +1,5 @@
+interface:
+  display_name: "Multica Coach"
+  short_description: "Derive separated Feature/Bug squads from accepted Skill evidence"
+policy:
+  allow_implicit_invocation: false

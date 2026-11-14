@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator.workspace-deployment-index.v1",
+  "title": "Operator-local Workspace deployment index v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "deployment_key", "workspace_key", "server_kind", "server_ref", "workspace_ref", "foundation_manifest_digest", "server_manifest_digest", "projects", "relocation_intent_digest", "generation", "updated_at"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator.workspace-deployment-index.v1"},
+    "deployment_key": {"$ref": "#/$defs/digest"},
+    "workspace_key": {"$ref": "#/$defs/digest"},
+    "server_kind": {"enum": ["cloud", "self-hosted"]},
+    "server_ref": {"type": "string", "minLength": 1},
+    "workspace_ref": {"type": "string", "minLength": 1},
+    "foundation_manifest_digest": {"$ref": "#/$defs/digest"},
+    "server_manifest_digest": {"anyOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+    "projects": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["project_manifest_digest", "candidate_digest"],
+        "properties": {
+          "project_manifest_digest": {"$ref": "#/$defs/digest"},
+          "candidate_digest": {"$ref": "#/$defs/digest"}
+        }
+      }
+    },
+    "relocation_intent_digest": {"anyOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+    "generation": {"type": "integer", "minimum": 1},
+    "updated_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {"digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}
+}

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Multica Deploy Customized Agents"
+  short_description: "Deploy customized workspace Skills, Agents, and declared Squads"
+policy:
+  allow_implicit_invocation: false

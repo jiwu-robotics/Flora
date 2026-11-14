@@ -1,0 +1,5 @@
+interface:
+  display_name: "Multica Triage"
+  short_description: "Triage Multica issues and PRs"
+policy:
+  allow_implicit_invocation: false

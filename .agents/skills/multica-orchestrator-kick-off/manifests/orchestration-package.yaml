@@ -1,0 +1,972 @@
+schema_version: "1.0"
+package:
+  id: multica-super-individual-orchestration
+  version: "9.0.0"
+  decision: ACCEPTED
+  generated_stage: W9
+  portable: true
+  application_state: proposal
+  live_resources_created: false
+  live_trial_executed: false
+
+provenance:
+  source_project: capability-sample-robox-nexus
+  source_revision: git:d24411c8840bab361745c1ed7b41cf4b3a43b3e3+mapping:sha256:8ab657d28bbb9ac295dd7c3c12d6cf9e54b150a2b6f2b29d6af4b7ccdbe3b6b8
+  requirements_revision: sha256:3b6caab15839cd7489bf30c23f9598a45fa309a3ade7a6227597ab83cb237d94
+  bindings_revision: sha256:180dac825603282c9c879c9ffb31e7a411af5a73131a77dc94a44fee8ebf1b32
+
+artifacts:
+  requirements: ../requirements/orchestration-requirements.md
+  handoff_gate_contracts: ../contracts/handoff-gate-contracts.md
+  branch_commit_policy: ../contracts/branch-and-commit-policy.md
+  agent_instructions: ../agents/agent-instructions.md
+  squad_instructions: ../squads/squad-instructions.md
+  agent_instruction_files:
+    shared-intake: ../agents/roles/shared-intake.md
+    workflow-leader: ../agents/roles/workflow-leader.md
+    feature-governance-producer: ../agents/roles/feature-governance-producer.md
+    feature-requirement-producer: ../agents/roles/feature-requirement-producer.md
+    feature-requirement-reviewer: ../agents/roles/feature-requirement-reviewer.md
+    feature-planning-producer: ../agents/roles/feature-planning-producer.md
+    feature-reviewer: ../agents/roles/feature-reviewer.md
+    feature-core-maker: ../agents/roles/feature-core-maker.md
+    feature-loop-maker: ../agents/roles/feature-loop-maker.md
+    feature-loop-checker: ../agents/roles/feature-loop-checker.md
+    feature-loop-guard: ../agents/roles/feature-loop-guard.md
+    feature-convergence-reviewer: ../agents/roles/feature-convergence-reviewer.md
+    fix-assessor: ../agents/roles/fix-assessor.md
+    fix-maker: ../agents/roles/fix-maker.md
+    fix-verifier: ../agents/roles/fix-verifier.md
+    commit-policy-reviewer: ../agents/roles/commit-policy-reviewer.md
+  squad_instruction_files:
+    feature: ../squads/feature-squad.md
+    fix: ../squads/fix-squad.md
+  issue_input_contracts: ../issues/issue-input-contracts.md
+  delivery_notes: ../delivery/delivery-notes.md
+  human_designation_policy: ../controls/human-designation-policy.yaml
+  human_designation_contract: ../controls/human-designation-contract.md
+  server_orchestration_ref_schema: ../contracts/server-orchestration-ref.schema.json
+
+status_contract:
+  authority: requirements-and-maintained-triage-contract
+  provider_verification: required-before-application
+  statuses:
+    - meaning: needs-maintainer-evaluation
+      key: needs_triage
+      category: backlog
+    - meaning: waiting-for-actionable-information
+      key: needs_information
+      category: blocked
+    - meaning: ready-for-explicit-agent-dispatch
+      key: ready_for_agent
+      category: backlog
+    - meaning: ready-for-human-work-or-decision
+      key: ready_for_human
+      category: todo
+    - meaning: explicitly-rejected
+      key: wontfix
+      category: cancelled
+  gate_values:
+    - APPROVED
+    - APPROVED_NA
+    - REJECTED
+    - BLOCKED
+  verification: human-web-confirmation
+  evidence_required: false
+
+policies:
+  default_worktree: true
+  execution_mode: worktree
+  checkout_provider: multica-runtime-and-repository-provider
+  nested_worktree_creation: forbidden
+  mandatory_after_specify_worktree_hook: forbidden
+  work_item_execution:
+    one_current_per_repository_work_item: true
+    epoch_required: true
+    one_active_writer_per_work_item: true
+    handoff_binding:
+      - execution_ref
+      - work_item_branch_ref
+      - run_checkout_ref
+      - scope_ref
+    cross_work_item_artifact_consumption: forbidden
+    completed_history: retained
+  concurrency:
+    unit: work-item-execution
+    cross_work_item_parallelism: scope-conflict-gate-controlled
+    same_work_item_writer_parallelism: forbidden
+    scope_conflict_gate_before_first_source_write: true
+    repository_global_resource_lease: atomic
+    same_repository_target_integration: serialized
+    fallback_when_serialization_or_atomicity_unverified: BLOCKED
+    safe_role_limits:
+      workflow-leader:
+        max_concurrent_tasks_when_atomic_ledger_unverified: 1
+      commit-policy-reviewer:
+        max_concurrent_tasks_when_report_isolation_unverified: 1
+  invocation:
+    execution_context_schema: multica-coach.execution-context-ref.v1
+    project_binding_schema: multica-orchestrator-nail-down.project-binding-ref.v11
+    active_release_schema: multica-orchestrator-migrate.active-project-release.v2
+    run_admission_schema: multica-orchestrator-dispatch.run-admission-ref.v1
+    leader_dispatch_schema: multica-coach.leader-dispatch-ref.v1
+    leader_dispatch_set_schema: multica-coach.leader-dispatch-set-ref.v1
+    provider_run_receipt_schema: multica-coach.provider-run-receipt-ref.v1
+    handoff_schema: multica-coach.handoff-ref.v3
+    artifact_schema: multica-coach.artifact-ref.v2
+    gate_schema: multica-coach.gate-record.v2
+    execution_schema: multica-coach.work-item-execution-ref.v4
+    work_item_branch_schema: multica-coach.work-item-branch-ref.v1
+    run_checkout_schema: multica-coach.run-checkout-ref.v1
+    checkout_schema: multica-coach.checkout-ref.v5
+    one_operation_per_run: true
+    one_consumer_per_handoff: true
+    native_squad_routing_required: true
+    leader_can_dispatch_roster_members: true
+    member_direct_chaining: false
+    eligibility_is_not_authorization: true
+    role_operations:
+      shared-intake: [triage-inspect, triage-apply, squad-bind, reclassify]
+      workflow-leader: [coordinate-trigger, validate-handoff, record-gate, record-scope-lease, record-invalidation, notify-human, record-lifecycle]
+      feature-governance-producer: [governance-draft, roadmap-write, adr-draft]
+      feature-requirement-producer: [specify, clarify-spec]
+      feature-requirement-reviewer: [requirement-check]
+      feature-planning-producer: [adr-context, plan, tasks]
+      feature-reviewer: [adr-check, analyze, roadmap-sync, roadmap-brief, roadmap-debrief]
+      feature-core-maker: [implement-core]
+      feature-loop-maker: [loop-define, loop-iterate, loop-status]
+      feature-loop-checker: [loop-check, loop-status-read]
+      feature-loop-guard: [loop-guard]
+      feature-convergence-reviewer: [converge]
+      fix-assessor: [fix-assess]
+      fix-maker: [fix-implement]
+      fix-verifier: [fix-verify]
+      commit-policy-reviewer: [verify-commit]
+  implementation_route:
+    choices:
+      - core
+      - loop
+    selected_by: human-authority
+    exactly_one: true
+    locked_after_first_source_write: true
+  loop:
+    eligible: true
+    isolation: none
+    complete_bundle_required: true
+    independent_checker_required: true
+    human_guard_required: true
+    shared_state_required: true
+    iteration_budget_required: true
+    cross_work_item_shared_state: forbidden
+  feature_fix_execution_agents_shared: false
+  producer_self_approval: forbidden
+  workflow_ledger: append-only-atomic-compare-and-set
+  tasks_write_policy:
+    planner: EXCLUSIVE_WRITE
+    human_and_analyze: READ_ONLY
+    convergence: APPEND_ONLY
+    cross_feature_paths: isolated-by-feature-directory
+  human_designation:
+    policy: human-designation-policy
+    current_email_required: true
+    explicit_consent_required: true
+    provider_role_binding_required: false
+    authorization_receipt_required: false
+    portable_document_must_not_contain_email: true
+    first_feature_gate: before-specify
+    initialization_and_major_change_gate: before-governance-input
+    fix_gate: before-fix-assess
+  branch_commit:
+    policy: branch-and-commit-policy
+    workflow_profile: git-flow
+    main_ref: main
+    develop_ref: develop
+    feature_pattern: feature/<owner>/<work-item-id>-<slug>
+    fix_pattern: fix/<owner>/<work-item-id>-<slug>
+    release_pattern: release/<version>
+    hotfix_pattern: hotfix/<owner>/<work-item-id>-<slug>
+    branch_provisioner: repository-provider-and-human-authority
+    commit_authority: repository-writing-agent-current-run-only
+    commit_policy_reviewer: commit-policy-reviewer
+    merge_method: provider-merge-commit-only
+    work_item_footer_required: true
+    push_merge_agent_permissions: forbidden
+    per_checkout_cwd_and_git_index_isolation_required: true
+    github_branch_permissions_required: false
+    integration_prerequisites: exact-source-target-human-verified-check-receipts-and-approval
+    repository_target_queue: serialized
+  gitflow_guidance:
+    skill: git-workflow
+    source: project-local-locked-skill
+    use: policy-reference-only
+    precedence: branch-and-commit-policy
+    grants_git_mutation_permission: false
+skill_bundles:
+  feature_execution:
+    - speckit-constitution
+    - speckit-roadmap-write
+    - speckit-roadmap-sync
+    - speckit-specify
+    - speckit-checklist
+    - speckit-clarify
+    - speckit-adrkit-context
+    - speckit-plan
+    - speckit-adrkit-check
+    - speckit-adrkit-draft
+    - speckit-tasks
+    - speckit-analyze
+    - speckit-roadmap-brief
+    - speckit-implement
+    - speckit-loop-define
+    - speckit-loop-run
+    - speckit-loop-check
+    - speckit-loop-guard
+    - speckit-loop-status
+    - speckit-roadmap-debrief
+    - speckit-converge
+  fix_execution:
+    - speckit-bug-assess
+    - speckit-bug-fix
+    - speckit-bug-test
+  source_control:
+    - conventional-commit
+  excluded:
+    - multica-orchestrator-link-up
+    - multica-orchestrator-nail-down
+    - multica-create-agent
+    - speckit-setup-project
+    - speckit-taskstoissues
+    - speckit-worktrees-specify
+    - speckit-worktrees-create
+    - speckit-worktrees-list
+    - speckit-worktrees-clean
+    - multica-coach
+
+agents:
+  - role_key: shared-intake
+    description: "统一接收、分类与准入工作项；不负责派发执行角色"
+    instructions: ../agents/roles/shared-intake.md
+    work_type: shared
+    responsibility: intake-producer
+    required_skills:
+      - multica-triage
+      - multica-cli
+      - multica-orchestrator-dispatch
+    optional_skills: []
+    forbidden_skill_bundles:
+      - feature_execution
+      - fix_execution
+      - excluded
+    permissions:
+      repository_write:
+        - governed-rejection-memory-only
+      multica_access: triage-inspect-apply-and-squad-bind-no-start-only
+      git_control: read-only
+      destructive_operations: false
+      credentials: runtime_injected
+    concurrency:
+      max_concurrent_tasks: 1
+      unit: work-item-execution-admission
+      requires:
+        - atomic-repository-work-item-epoch-deduplication
+      duplicate_dispatch: forbidden
+
+  - role_key: workflow-leader
+    description: "Feature 与 Fix Squad 的唯一协调者；校验门禁并按 roster 精确路由"
+    instructions: ../agents/roles/workflow-leader.md
+    work_type: shared
+    responsibility: leader
+    required_skills:
+      - multica-cli
+      - multica-orchestrator-dispatch
+    optional_skills: []
+    forbidden_skills:
+      - multica-triage
+    forbidden_skill_bundles:
+      - feature_execution
+      - fix_execution
+      - excluded
+    permissions:
+      repository_write: []
+      multica_access: native-squad-coordination-recording-and-designated-human-notification-only
+      git_control: read-only
+      destructive_operations: false
+      credentials: runtime_injected
+    concurrency:
+      max_concurrent_tasks: 1
+      unit: work-item-execution
+      requires:
+        - atomic-workflow-ledger
+        - atomic-resource-leases
+        - atomic-notification-reservation
+
+  - role_key: commit-policy-reviewer
+    description: "独立验证 producer commits、scope、message 与 Work-Item footer"
+    instructions: ../agents/roles/commit-policy-reviewer.md
+    work_type: shared
+    responsibility: commit-policy-reviewer
+    required_skills:
+      - conventional-commit
+    optional_skills: []
+    forbidden_skill_bundles:
+      - feature_execution
+      - fix_execution
+      - excluded
+    permissions:
+      repository_write: []
+      multica_access: none
+      git_control: read-only
+      destructive_operations: false
+      credentials: none
+    concurrency:
+      max_concurrent_tasks: 1
+      unit: immutable-commit-range
+      requires:
+        - current-execution-candidate-commit-binding
+        - immutable-source-revision
+        - isolated-report-namespace
+
+  - role_key: feature-governance-producer
+    description: "起草并维护 Constitution、Architecture、Roadmap 与获授权 ADR 草案"
+    instructions: ../agents/roles/feature-governance-producer.md
+    work_type: feature
+    responsibility: producer
+    required_skills:
+      - speckit-constitution
+      - speckit-roadmap-write
+      - conventional-commit
+    optional_skills:
+      - name: speckit-adrkit-draft
+        when: human-authorized-current-plan-adr-gap
+    forbidden_skill_bundles:
+      - fix_execution
+      - excluded
+    permissions:
+      repository_write:
+        - .specify/memory/constitution.md
+        - .specify/memory/architecture.md
+        - configured-roadmap-path
+        - configured-adr-draft-path
+      multica_access: none
+      git_control: scoped-ordinary-commit
+      destructive_operations: false
+      credentials: none
+    concurrency:
+      max_concurrent_tasks: 1
+      cross_work_item: conditional
+      requires:
+        - current-execution-checkout-scope
+        - repository-global-resource-lease
+
+  - role_key: feature-requirement-producer
+    description: "把已接受 Feature Brief 写成 canonical Spec 并处理产品澄清"
+    instructions: ../agents/roles/feature-requirement-producer.md
+    work_type: feature
+    responsibility: producer
+    required_skills:
+      - speckit-specify
+      - conventional-commit
+    optional_skills:
+      - name: speckit-clarify
+        when: requirement-gate-product-decision-blocker
+    forbidden_skill_bundles:
+      - fix_execution
+      - excluded
+    permissions:
+      repository_write:
+        - resolved-feature-spec-and-skill-metadata
+      multica_access: none
+      git_control: scoped-ordinary-commit
+      destructive_operations: false
+      credentials: none
+    concurrency:
+      max_concurrent_tasks: 1
+      cross_work_item: conditional
+      requires:
+        - current-execution-checkout-scope
+        - isolated-feature-directory
+
+  - role_key: feature-requirement-reviewer
+    description: "独立审查 current Spec 并只产出 Requirement Gate"
+    instructions: ../agents/roles/feature-requirement-reviewer.md
+    work_type: feature
+    responsibility: reviewer
+    required_skills:
+      - speckit-checklist
+      - conventional-commit
+    optional_skills: []
+    forbidden_skill_bundles:
+      - fix_execution
+      - excluded
+    permissions:
+      repository_write:
+        - resolved-feature-requirements-gate-only
+      multica_access: none
+      git_control: scoped-ordinary-commit
+      destructive_operations: false
+      credentials: none
+    concurrency:
+      max_concurrent_tasks: 1
+      cross_work_item: conditional
+      requires:
+        - current-execution-checkout-scope
+        - isolated-feature-directory
+
+  - role_key: feature-planning-producer
+    description: "基于已通过的需求与治理产出 ADR context、Plan 和 Tasks"
+    instructions: ../agents/roles/feature-planning-producer.md
+    work_type: feature
+    responsibility: producer
+    required_skills:
+      - speckit-adrkit-context
+      - speckit-plan
+      - speckit-tasks
+      - conventional-commit
+    optional_skills: []
+    forbidden_skill_bundles:
+      - fix_execution
+      - excluded
+    permissions:
+      repository_write:
+        - resolved-feature-plan-bundle
+        - resolved-feature-tasks
+      multica_access: none
+      git_control: scoped-ordinary-commit
+      destructive_operations: false
+      credentials: none
+    concurrency:
+      max_concurrent_tasks: 1
+      cross_work_item: conditional
+      requires:
+        - current-execution-checkout-scope
+        - tasks-path-exclusive-lease
+
+  - role_key: feature-reviewer
+    description: "独立执行 ADR、Plan、Roadmap 与实现证据审查"
+    instructions: ../agents/roles/feature-reviewer.md
+    work_type: feature
+    responsibility: reviewer
+    required_skills:
+      - speckit-adrkit-check
+      - speckit-analyze
+      - speckit-roadmap-brief
+      - speckit-roadmap-debrief
+      - conventional-commit
+    optional_skills:
+      - name: speckit-roadmap-sync
+        when: human-request-or-project-wide-drift-evidence
+    forbidden_skill_bundles:
+      - fix_execution
+      - excluded
+    permissions:
+      repository_write:
+        - timestamped-roadmap-review-reports-only
+      multica_access: none
+      git_control: scoped-ordinary-commit
+      destructive_operations: false
+      credentials: none
+    concurrency:
+      max_concurrent_tasks: 1
+      cross_work_item: true
+      requires:
+        - current-execution-read-only-inputs
+        - no-upstream-writer
+
+  - role_key: feature-core-maker
+    description: "只在 core route 内按已批准 Tasks 实现源码和测试"
+    instructions: ../agents/roles/feature-core-maker.md
+    work_type: feature
+    responsibility: maker
+    required_skills:
+      - speckit-implement
+      - conventional-commit
+    optional_skills: []
+    forbidden_skills:
+      - speckit-loop-define
+      - speckit-loop-run
+      - speckit-loop-check
+      - speckit-loop-guard
+      - speckit-loop-status
+    forbidden_skill_bundles:
+      - fix_execution
+      - excluded
+    permissions:
+      repository_write:
+        - approved-feature-source-test-scope
+        - authorized-task-completion-markers
+      multica_access: none
+      git_control: scoped-ordinary-commit
+      destructive_operations: false
+      credentials: none
+    concurrency:
+      max_concurrent_tasks: 1
+      cross_work_item: conditional
+      requires:
+        - current-execution-checkout-scope
+        - clear-scope-conflict-gate
+        - no-conflicting-resource-lease
+
+  - role_key: feature-loop-maker
+    description: "只在 loop route 内定义并执行 maker iteration"
+    instructions: ../agents/roles/feature-loop-maker.md
+    work_type: feature
+    responsibility: maker
+    required_skills:
+      - speckit-loop-define
+      - speckit-loop-run
+      - speckit-loop-status
+      - conventional-commit
+    optional_skills: []
+    forbidden_skills:
+      - speckit-implement
+      - speckit-loop-check
+      - speckit-loop-guard
+      - speckit-worktrees-create
+    forbidden_skill_bundles:
+      - fix_execution
+      - excluded
+    permissions:
+      repository_write:
+        - approved-feature-source-test-scope
+        - feature-local-loop-maker-state
+      multica_access: none
+      git_control: scoped-ordinary-commit-no-worktree-create
+      destructive_operations: false
+      credentials: none
+    concurrency:
+      max_concurrent_tasks: 1
+      cross_work_item: conditional
+      requires:
+        - current-execution-checkout-scope
+        - clear-scope-conflict-gate
+        - execution-local-loop-state
+
+  - role_key: feature-loop-checker
+    description: "独立验证一个 immutable Loop iteration；不修改 maker state"
+    instructions: ../agents/roles/feature-loop-checker.md
+    work_type: feature
+    responsibility: verifier
+    required_skills:
+      - speckit-loop-check
+      - conventional-commit
+    optional_skills:
+      - name: speckit-loop-status
+        when: render-current-state-read-only
+    forbidden_skills:
+      - speckit-implement
+      - speckit-loop-define
+      - speckit-loop-run
+      - speckit-loop-guard
+    forbidden_skill_bundles:
+      - fix_execution
+      - excluded
+    permissions:
+      repository_write:
+        - feature-local-loop-checker-state-only
+      multica_access: none
+      git_control: scoped-report-commit
+      destructive_operations: false
+      credentials: none
+    concurrency:
+      max_concurrent_tasks: 1
+      cross_work_item: true
+      requires:
+        - current-execution-independent-session
+        - execution-local-loop-state
+
+  - role_key: feature-loop-guard
+    description: "呈现 Loop 风险、预算与债务并生成 Human 决策请求输入"
+    instructions: ../agents/roles/feature-loop-guard.md
+    work_type: feature
+    responsibility: human-support-guard
+    required_skills:
+      - speckit-loop-guard
+      - speckit-loop-status
+      - conventional-commit
+    optional_skills: []
+    forbidden_skills:
+      - speckit-implement
+      - speckit-loop-define
+      - speckit-loop-run
+      - speckit-loop-check
+    forbidden_skill_bundles:
+      - fix_execution
+      - excluded
+    permissions:
+      repository_write:
+        - feature-local-loop-guard-debt-state-only
+      multica_access: none
+      git_control: scoped-report-commit
+      destructive_operations: false
+      credentials: none
+    concurrency:
+      max_concurrent_tasks: 1
+      cross_work_item: true
+      requires:
+        - current-execution-read-only-state
+        - execution-local-loop-state
+
+  - role_key: feature-convergence-reviewer
+    description: "复核 Feature 闭环并只追加必要的 Convergence tasks"
+    instructions: ../agents/roles/feature-convergence-reviewer.md
+    work_type: feature
+    responsibility: append-only-reviewer
+    required_skills:
+      - speckit-converge
+      - conventional-commit
+    optional_skills: []
+    forbidden_skill_bundles:
+      - fix_execution
+      - excluded
+    permissions:
+      repository_write:
+        - resolved-feature-tasks-append-only
+      multica_access: none
+      git_control: scoped-ordinary-commit
+      destructive_operations: false
+      credentials: none
+    concurrency:
+      max_concurrent_tasks: 1
+      cross_work_item: conditional
+      requires:
+        - current-execution-checkout-scope
+        - tasks-path-append-only-lease
+
+  - role_key: fix-assessor
+    description: "复现 Fix 偏差、定位根因并判定修复或 Feature escalation"
+    instructions: ../agents/roles/fix-assessor.md
+    work_type: fix
+    responsibility: assessment-producer
+    required_skills:
+      - speckit-bug-assess
+      - conventional-commit
+    optional_skills: []
+    forbidden_skill_bundles:
+      - feature_execution
+      - excluded
+    forbidden_skills:
+      - speckit-bug-fix
+      - speckit-bug-test
+    permissions:
+      repository_write:
+        - resolved-fix-assessment-only
+      multica_access: none
+      git_control: scoped-report-commit
+      destructive_operations: false
+      credentials: none
+    concurrency:
+      max_concurrent_tasks: 1
+      cross_work_item: conditional
+      requires:
+        - current-execution-checkout
+        - isolated-fix-directory
+        - assessment-single-writer
+
+  - role_key: fix-maker
+    description: "在已批准 Fix scope 内实施最小修复并生成验证证据"
+    instructions: ../agents/roles/fix-maker.md
+    work_type: fix
+    responsibility: maker
+    required_skills:
+      - speckit-bug-fix
+      - conventional-commit
+    optional_skills: []
+    forbidden_skill_bundles:
+      - feature_execution
+      - excluded
+    forbidden_skills:
+      - speckit-bug-assess
+      - speckit-bug-test
+    permissions:
+      repository_write:
+        - approved-fix-source-test-scope
+        - resolved-upstream-fix-report
+      multica_access: none
+      git_control: scoped-ordinary-commit
+      destructive_operations: false
+      credentials: none
+    concurrency:
+      max_concurrent_tasks: 1
+      cross_work_item: conditional
+      requires:
+        - current-execution-checkout-scope
+        - clear-scope-conflict-gate
+        - no-conflicting-resource-lease
+
+  - role_key: fix-verifier
+    description: "独立重放原始症状与关键回归并验证 exact fix revision"
+    instructions: ../agents/roles/fix-verifier.md
+    work_type: fix
+    responsibility: verifier
+    required_skills:
+      - speckit-bug-test
+      - conventional-commit
+    optional_skills: []
+    forbidden_skill_bundles:
+      - feature_execution
+      - excluded
+    forbidden_skills:
+      - speckit-bug-assess
+      - speckit-bug-fix
+    permissions:
+      repository_write:
+        - resolved-fix-test-report-only
+      multica_access: none
+      git_control: scoped-report-commit
+      destructive_operations: false
+      credentials: none
+    concurrency:
+      max_concurrent_tasks: 1
+      cross_work_item: true
+      requires:
+        - current-execution-independent-session
+        - immutable-fix-revision
+
+shared_intake:
+  role_key: shared-intake
+  squad_membership: [feature, fix]
+  routes_to:
+    - squad: feature
+      leader: workflow-leader
+      required_work_type: feature
+    - squad: fix
+      leader: workflow-leader
+      required_work_type: fix
+
+human_participation:
+  project_binding_contract: multica-orchestrator-nail-down.project-binding-ref.v8
+  authority:
+    designation: HumanDesignationRef
+    decision: HumanDecisionRef
+    notification_recipient_is_authority: false
+  notification:
+    actor_role: workflow-leader
+    target: exact-designated-human-member-only
+    automatic_initial: true
+    atomic_reservation:
+      required: true
+      key_fields:
+        - project_ref
+        - work_item_ref
+        - execution_ref
+        - subject
+        - designation_ref
+        - participation_plan_ref
+        - sorted_input_revisions
+      one_initial_per_current_request: true
+    provider_scheduled_reminders:
+      max: 2
+      intervals:
+        - PT24H
+        - PT72H
+    readback_required: true
+    forbidden:
+      - mixed-agent-and-human-mention
+      - squad-mention-from-delegation
+      - all-mention
+      - assignment-by-leader
+      - direct-rerun
+      - cancel
+      - decision-inference
+  decision_routing:
+    native_leader_trigger: true
+    member_result_retriggers_leader: true
+    human_gate_requires_current_decision: true
+    leader_dispatch_record_required: true
+    provider_run_receipt_required: true
+    active_or_queued_run_deduplication_required: true
+    current_execution_run_deduplication_required: true
+squads:
+  - squad_key: feature
+    description: "从 Feature Brief 到 develop 集成证据的受门禁交付 Squad"
+    instructions: ../squads/feature-squad.md
+    work_type: feature
+    leader: workflow-leader
+    members:
+      - role_key: feature-governance-producer
+        squad_role: "治理、Architecture、Roadmap 和 ADR 草案唯一 writer"
+      - role_key: feature-requirement-producer
+        squad_role: "Feature Spec 唯一 writer；处理产品澄清"
+      - role_key: feature-requirement-reviewer
+        squad_role: "独立验证 current Spec；只产出 Requirement Gate"
+      - role_key: feature-planning-producer
+        squad_role: "Plan 与 tasks.md 唯一普通 writer"
+      - role_key: feature-reviewer
+        squad_role: "独立审查 ADR、Plan、Roadmap 与实现证据"
+      - role_key: feature-core-maker
+        squad_role: "Core route 源码与测试 writer"
+      - role_key: feature-loop-maker
+        squad_role: "Loop contract、iteration 与 maker state writer"
+      - role_key: feature-loop-checker
+        squad_role: "独立检查最新 Loop iteration；不修改 maker state"
+      - role_key: feature-loop-guard
+        squad_role: "呈现 Loop 风险并记录 Human sign-off evidence"
+      - role_key: feature-convergence-reviewer
+        squad_role: "闭环复核并只追加 Convergence tasks"
+      - role_key: shared-intake
+        squad_role: "合同变化重分类与缺失信息澄清；不派活"
+      - role_key: commit-policy-reviewer
+        squad_role: "独立验证 producer commits、scope、message 与 Work-Item footer"
+    concurrency:
+      unit: work-item-execution
+      cross_work_item_parallel: different-repository-root-only
+      prerequisites:
+        - collaboration-runtime-placement
+        - in-place-root-serialization
+        - clear-scope-conflict-gate
+        - no-conflicting-resource-lease
+      within_work_item: feature-dag-serialized
+      core_loop_mutually_exclusive: true
+      tasks_writers_serialized: true
+
+  - squad_key: fix
+    description: "从缺陷复现到 develop 集成证据的最小修复 Squad"
+    instructions: ../squads/fix-squad.md
+    work_type: fix
+    leader: workflow-leader
+    members:
+      - role_key: fix-assessor
+        squad_role: "复现偏差、定位根因并判定 fixable 或 Feature escalation"
+      - role_key: fix-maker
+        squad_role: "在 approved Fix scope 内实施最小修复"
+      - role_key: fix-verifier
+        squad_role: "独立重放原始症状与 critical regression"
+      - role_key: shared-intake
+        squad_role: "合同变化重分类与缺失信息澄清；不派活"
+      - role_key: commit-policy-reviewer
+        squad_role: "独立验证 producer commits、scope、message 与 Work-Item footer"
+    concurrency:
+      unit: work-item-execution
+      cross_work_item_parallel: different-repository-root-only
+      prerequisites:
+        - collaboration-runtime-placement
+        - in-place-root-serialization
+        - clear-scope-conflict-gate
+        - no-conflicting-resource-lease
+      within_work_item:
+        - assess-before-fix
+        - fix-before-verify
+
+issue_templates:
+  feature:
+    path: ../issues/issue-input-contracts.md
+    anchor: feature-issue-template
+    required_work_type: feature
+  fix:
+    path: ../issues/issue-input-contracts.md
+    anchor: fix-issue-template
+    required_work_type: fix
+
+server_preconditions:
+  - id: status-contract-readback
+    owner: workspace-administrator
+    required: true
+    failure: STATUS_CONTRACT_DRIFT
+
+project_binding_requirements:
+  - id: requirement-rule-fragments
+    owner: repository-provider
+    required: true
+    failure: REQUIREMENT_RULES_UNAVAILABLE
+  - id: disable-mandatory-worktree-hook
+    owner: repository-provider
+    required: true
+    failure: WORKTREE_HOOK_CONFLICT
+  - id: approved-gitflow-checkout
+    owner: repository-provider-and-human-authority
+    required: true
+    failure: WRITE_SCOPE_BLOCKED
+  - id: gitflow-protection-readback
+    owner: repository-provider-and-human-authority
+    required: true
+    failure: BRANCH_POLICY_VIOLATION
+  - id: commit-policy-readback
+    owner: repository-administrator
+    required: true
+    failure: COMMIT_POLICY_INVALID
+  - id: pr-integration-readback
+    owner: repository-provider
+    required: true
+    failure: INTEGRATION_POLICY_INVALID
+  - id: loop-effective-isolation-none
+    owner: repository-provider
+    required_when: loop-route-enabled
+    failure: LOOP_INELIGIBLE
+  - id: loop-independent-checker-session
+    owner: runtime-provider
+    required_when: loop-route-enabled
+    failure: LOOP_INELIGIBLE
+  - id: human-designation-confirmation
+    owner: human-designation-operator
+    required: true
+    failure: HUMAN_DESIGNATION_UNCONFIRMED
+  - id: human-decision-ledger
+    owner: human-designation-operator-and-workflow-leader
+    required: true
+    failure: HUMAN_APPROVAL_EVIDENCE_INVALID
+  - id: human-participation-plan
+    owner: human-designation-operator-and-workflow-leader
+    required: true
+    failure: HUMAN_PARTICIPATION_PLAN_UNRESOLVED
+  - id: human-notification-controller-readback
+    owner: multica-provider-and-human-designation-operator
+    required: true
+    failure: HUMAN_NOTIFICATION_CONTROL_UNVERIFIED
+  - id: multi-work-item-execution-isolation
+    owner: runtime-provider
+    required_before: concurrent-dispatch
+    failure: MULTI_WORK_ITEM_EXECUTION_ISOLATION_UNVERIFIED
+  - id: atomic-workflow-ledger
+    owner: orchestration-control-owner
+    required_before: concurrent-dispatch
+    failure: WORKFLOW_LEDGER_ATOMICITY_UNVERIFIED
+  - id: cross-work-item-scope-conflict-gate
+    owner: repository-provider
+    required_before: first-source-write
+    failure: WORK_SCOPE_CONFLICT_UNRESOLVED
+  - id: repository-global-resource-lease
+    owner: repository-provider
+    required_before: concurrent-repository-write
+    failure: RESOURCE_LEASE_CONTROL_UNVERIFIED
+  - id: repository-integration-queue
+    owner: repository-provider
+    required_before: concurrent-pr-integration
+    failure: INTEGRATION_QUEUE_UNVERIFIED
+  - id: collaboration-runtime-and-root-serialization
+    owner: project-runtime-provider
+    required_before: first-execution-member-dispatch
+    failure: COLLABORATION_RUNTIME_PLACEMENT_UNVERIFIED
+  - id: atomic-human-notification-dedupe
+    owner: workflow-leader-and-provider
+    required_before: concurrent-human-gates
+    failure: HUMAN_NOTIFICATION_DEDUPE_UNVERIFIED
+
+human_approval_subjects:
+  - governance-input
+  - constitution
+  - architecture
+  - adr
+  - roadmap
+  - tasks
+  - implementation-route
+  - loop-signoff
+  - risk-override
+  - final-acceptance
+
+completion:
+  agent_completion_is_issue_completion: false
+  issue_done_requires:
+    - all-required-gates-current-and-approved
+    - no-open-blockers
+    - exact-artifact-revisions
+    - human-final-acceptance
+    - current-commit-ref
+    - current-integration-ref
+    - promotion-ref-when-release-or-hotfix
+  concurrency_requires:
+    - current-work-item-execution-ref
+    - no-unresolved-scope-conflict
+    - no-active-conflicting-resource-lease
+    - current-source-and-target-revisions
+    - no-duplicate-active-or-queued-run
+    - no-overlapping-integration-attempt

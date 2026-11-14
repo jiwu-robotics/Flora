@@ -1,0 +1,31 @@
+# Replace multica.example.com with an authorized DNS name.
+# Use with docker-compose.caddy.yml and a single explicit CADDY_BIND_IP.
+multica.example.com {
+    # The CLI probes this path before browser login.
+    handle /health {
+        reverse_proxy backend:8080
+    }
+
+    handle /readyz {
+        reverse_proxy backend:8080
+    }
+
+    # Browser realtime traffic must bypass the frontend proxy.
+    handle /ws {
+        reverse_proxy backend:8080 {
+            flush_interval -1
+        }
+    }
+
+    # Daemons use a different WebSocket endpoint from the browser.
+    handle /api/daemon/ws {
+        reverse_proxy backend:8080 {
+            flush_interval -1
+        }
+    }
+
+    # The frontend forwards ordinary API and login traffic to the backend.
+    handle {
+        reverse_proxy frontend:3000
+    }
+}

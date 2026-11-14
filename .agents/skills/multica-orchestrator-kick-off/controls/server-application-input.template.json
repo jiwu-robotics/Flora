@@ -1,0 +1,32 @@
+{
+  "schema": "multica-orchestrator.server-application-input.v7",
+  "bundle_store": {
+    "state_root": "<absolute-operator-state-root>"
+  },
+  "workspace_handoff_bundle": {
+    "manifest_digest": "sha256:<foundation-bundle-manifest-digest>"
+  },
+  "consumer_session": {
+    "profile": "<consumer-local-profile>",
+    "account_ref": "<authenticated-account-ref>"
+  },
+  "collaboration_runtime_alias": "<runtime-alias>",
+  "agents": {
+    "shared-intake": {"model": "<model>", "thinking_level": null, "max_concurrent_tasks": 1, "permission_mode": "private"},
+    "workflow-leader": {"model": "<model>", "thinking_level": null, "max_concurrent_tasks": 1, "permission_mode": "private"},
+    "commit-policy-reviewer": {"model": "<model>", "thinking_level": null, "max_concurrent_tasks": 1, "permission_mode": "private"},
+    "feature-governance-producer": {"model": "<model>", "thinking_level": null, "max_concurrent_tasks": 1, "permission_mode": "private"},
+    "feature-requirement-producer": {"model": "<model>", "thinking_level": null, "max_concurrent_tasks": 1, "permission_mode": "private"},
+    "feature-requirement-reviewer": {"model": "<model>", "thinking_level": null, "max_concurrent_tasks": 1, "permission_mode": "private"},
+    "feature-planning-producer": {"model": "<model>", "thinking_level": null, "max_concurrent_tasks": 1, "permission_mode": "private"},
+    "feature-reviewer": {"model": "<model>", "thinking_level": null, "max_concurrent_tasks": 1, "permission_mode": "private"},
+    "feature-core-maker": {"model": "<model>", "thinking_level": null, "max_concurrent_tasks": 1, "permission_mode": "private"},
+    "feature-loop-maker": {"model": "<model>", "thinking_level": null, "max_concurrent_tasks": 1, "permission_mode": "private"},
+    "feature-loop-checker": {"model": "<model>", "thinking_level": null, "max_concurrent_tasks": 1, "permission_mode": "private"},
+    "feature-loop-guard": {"model": "<model>", "thinking_level": null, "max_concurrent_tasks": 1, "permission_mode": "private"},
+    "feature-convergence-reviewer": {"model": "<model>", "thinking_level": null, "max_concurrent_tasks": 1, "permission_mode": "private"},
+    "fix-assessor": {"model": "<model>", "thinking_level": null, "max_concurrent_tasks": 1, "permission_mode": "private"},
+    "fix-maker": {"model": "<model>", "thinking_level": null, "max_concurrent_tasks": 1, "permission_mode": "private"},
+    "fix-verifier": {"model": "<model>", "thinking_level": null, "max_concurrent_tasks": 1, "permission_mode": "private"}
+  }
+}

@@ -1,0 +1,147 @@
+schema_version: "1.0"
+template:
+  id: multica-orchestration-human-participation-plan
+  tracked: true
+  portable: true
+  application_state: template
+  live_identifiers_present: false
+  copy_target: restricted-operator-local-state-directory
+
+plan:
+  plan_id: "<operator-local stable plan id>"
+  project_ref: "<operator-local opaque project ref>"
+  scope: project
+  work_item_ref: null
+  state: CURRENT
+  supersedes: null
+  human_designation_ref: "<current HumanDesignationRef>"
+
+  decision_subjects:
+    governance-input:
+      decision_owner: designated-human
+    constitution:
+      decision_owner: designated-human
+    architecture:
+      decision_owner: designated-human
+    adr:
+      decision_owner: designated-human
+    roadmap:
+      decision_owner: designated-human
+    tasks:
+      decision_owner: designated-human
+    implementation-route:
+      decision_owner: designated-human
+    loop-signoff:
+      decision_owner: designated-human
+    risk-override:
+      decision_owner: designated-human
+    final-acceptance:
+      decision_owner: designated-human
+
+  information_routes:
+    product-question:
+      owner_ref: designated-human
+    governance-source:
+      owner_ref: "<operator-local role or source-owner ref>"
+    reproduction:
+      owner_ref: "<operator-local reporter or source-owner ref>"
+    environment-or-test-data:
+      owner_ref: "<operator-local operations or data-owner ref>"
+    target-only-verification:
+      owner_ref: "<operator-local QA or operations ref>"
+    repository-or-checkout:
+      owner_ref: "<operator-local repository-provider ref>"
+    integration:
+      owner_ref: "<operator-local integration-operator ref>"
+
+  notification:
+    enabled: true
+    actor_role: workflow-leader
+    channel: multica-member-mention
+    recipient:
+      member_ref: "<operator-local Multica member ref>"
+      must_resolve_from: human_designation_ref
+      authenticated_email_match_required: true
+    request:
+      automatic_on_current_human_gate: true
+      execution_ref_required: true
+      required_payload:
+        - approval-subject
+        - project-ref
+        - work-item-ref
+        - execution-ref
+        - current-artifact-revisions
+        - actual-diff-or-evidence-refs
+        - accepted-rejected-revision-requested-actions
+        - one-concrete-required-action
+      dedupe_key:
+        - project-ref
+        - work-item-ref
+        - execution-ref
+        - approval-subject
+        - human-designation-ref
+        - human-participation-plan-ref
+        - sorted-input-revisions
+      reservation:
+        atomic_compare_and_set_required: true
+        initial_state: UNRESERVED
+        send_allowed_state: RESERVED
+        terminal_states:
+          - SENT
+          - FAILED
+        one_initial_per_current_request: true
+    reminders:
+      enabled: true
+      scheduler_ref: "<operator-local provider scheduler ref>"
+      intervals:
+        - PT24H
+        - PT72H
+      max_reminders: 2
+      stop_when:
+        - current-human-decision-recorded
+        - request-superseded-or-stale
+        - human-designation-changed
+        - work-item-terminal
+    readback:
+      required: true
+      receipt_store_ref: "<operator-local append-only notification receipt store>"
+      reservation_readback_required: true
+      concurrent_duplicate_send_forbidden: true
+    forbidden_targets:
+      - agent-mention
+      - squad-mention
+      - all-mention
+    forbidden_effects:
+      - assignment-change
+      - agent-or-squad-dispatch
+      - rerun-or-cancel
+      - decision-inference-from-delivery
+
+  decision_routing:
+    accepted:
+      effect: open-exact-downstream-gate
+      automatic_agent_start: false
+    revision_requested:
+      effect: return-to-unique-owning-producer-or-maker
+      automatic_agent_start: false
+    rejected:
+      effect: stop-downstream-or-return-per-current-workflow-contract
+      automatic_agent_start: false
+    explicit_resume_or_dispatch_required: true
+    active_or_queued_run_deduplication_required: true
+    current_execution_ref_required: true
+
+security:
+  directory_mode: "0700"
+  file_mode: "0600"
+  append_only_ledgers: true
+  atomic_compare_and_set_ledgers: true
+  tracked_template_must_not_contain:
+    - live-email
+    - workspace-uuid
+    - project-id
+    - member-id
+    - server
+    - credential
+    - token
+    - absolute-machine-path

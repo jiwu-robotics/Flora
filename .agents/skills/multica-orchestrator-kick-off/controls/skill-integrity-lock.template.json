@@ -1,0 +1,29 @@
+{
+  "schema": "skill-integrity-lock/v1",
+  "manifest_sha256": "sha256:<accepted-manifest-content-digest>",
+  "skills": [
+    {
+      "name": "<exact-manifest-skill-name>",
+      "source": {
+        "revision": "git:<full-clean-source-commit>",
+        "relative_path": "skills/<exact-manifest-skill-name>",
+        "content_sha256": "sha256:<canonical-source-content-digest>"
+      },
+      "archive": {
+        "relative_path": "archives/<exact-manifest-skill-name>.skill",
+        "sha256": "sha256:<raw-archive-bytes-digest>",
+        "content_sha256": "sha256:<canonical-archive-content-digest>"
+      },
+      "workspace": {
+        "id": "<operator-local-workspace-skill-id>",
+        "content_sha256": "sha256:<canonical-workspace-content-digest>"
+      }
+    }
+  ],
+  "agents": [
+    {
+      "role_key": "<exact-manifest-role-key>",
+      "id": "<operator-local-agent-id>"
+    }
+  ]
+}

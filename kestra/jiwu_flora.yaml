@@ -1,0 +1,77 @@
+id: jiwu_flora
+namespace: flora.jiwu
+description: Validate and optionally annotate Jiwu DAgger high_cam or UMI ego_l episodes.
+inputs:
+  - id: dataset
+    type: SELECT
+    values: [dagger, umi]
+    defaults: umi
+  - id: max_parts
+    type: INT
+    defaults: 1
+    description: Maximum video parts, 0 processes the full dataset.
+  - id: inference
+    type: BOOL
+    defaults: false
+    description: Run GPU inference after input validation.
+tasks:
+  - id: validate
+    type: io.kestra.plugin.scripts.shell.Commands
+    runIf: "{{ inputs.inference == false }}"
+    containerImage: jiwu.robotics/robox-datapilot/flora:latest
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+      host: tcp://datapilot-preprocess-dind:2375
+      pullPolicy: NEVER
+      user: "0:0"
+      volumes:
+        - /data/jiwu-dagger:/data/jiwu-dagger:ro
+        - /data/jiwu-umi:/data/jiwu-umi:ro
+        - /var/lib/preprocess-results:/results
+    env:
+      DATASET_KIND: "{{ inputs.dataset }}"
+      MAX_PARTS: "{{ inputs.max_parts }}"
+      EXECUTION_ID: "{{ execution.id }}"
+    commands:
+      - |
+        set -eu
+        case "$DATASET_KIND" in
+          dagger) dataset=/data/jiwu-dagger/Robot_data_liqian_20261030_174559 ;;
+          umi) dataset=/data/jiwu-umi/Robot_data_Bing_20261111_144059 ;;
+          *) exit 2 ;;
+        esac
+        cd /app
+        python -m src.infer --kind "$DATASET_KIND" --dataset "$dataset" --max-parts "$MAX_PARTS" --output "/results/flora/$EXECUTION_ID"
+  - id: annotate
+    type: io.kestra.plugin.scripts.shell.Commands
+    runIf: "{{ inputs.inference == true }}"
+    containerImage: jiwu.robotics/robox-datapilot/flora:latest
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+      host: tcp://datapilot-preprocess-dind:2375
+      pullPolicy: NEVER
+      user: "0:0"
+      deviceRequests:
+        - driver: nvidia
+          count: "1"
+          capabilities: [[gpu]]
+      volumes:
+        - /data/jiwu-dagger:/data/jiwu-dagger:ro
+        - /data/jiwu-umi:/data/jiwu-umi:ro
+        - /var/lib/preprocess-results:/results
+    env:
+      DATASET_KIND: "{{ inputs.dataset }}"
+      MAX_PARTS: "{{ inputs.max_parts }}"
+      EXECUTION_ID: "{{ execution.id }}"
+      FLORA_MODEL_CACHE: /results/flora-model-cache/models
+      HF_HOME: /results/flora-model-cache/huggingface
+    commands:
+      - |
+        set -eu
+        case "$DATASET_KIND" in
+          dagger) dataset=/data/jiwu-dagger/Robot_data_liqian_20261030_174559 ;;
+          umi) dataset=/data/jiwu-umi/Robot_data_Bing_20261111_144059 ;;
+          *) exit 2 ;;
+        esac
+        cd /app
+        python -m src.infer --kind "$DATASET_KIND" --dataset "$dataset" --max-parts "$MAX_PARTS" --output "/results/flora/$EXECUTION_ID" --run

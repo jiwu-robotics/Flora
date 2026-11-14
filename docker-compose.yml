@@ -1,0 +1,16 @@
+services:
+  flora:
+    image: jiwu.robotics/robox-datapilot/flora:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ubuntu24.04-2.11.0+cu128
+    gpus: all
+    environment:
+      FLORA_MODEL_CACHE: /model_zoo/flora/models
+      HF_HOME: /model_zoo/huggingface
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - ./model_zoo:/model_zoo
+      - ${FLORA_DATA_DIR:-.}:/data:ro
+      - ${FLORA_OUTPUT_DIR:-./outputs}:/outputs
+    working_dir: /app

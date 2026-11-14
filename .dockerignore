@@ -1,0 +1,15 @@
+.git
+.agents
+.venv*
+__pycache__
+*.pyc
+model_zoo
+outputs
+.env
+.env.*
+*.mp4
+*.mov
+*.mkv
+*.safetensors
+*.ckpt
+*.pth

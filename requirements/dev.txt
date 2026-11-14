@@ -1,0 +1,2 @@
+# Flora TempSeg uses the annotation pipeline dependencies.
+-r ../captioner/batch_utils/requirements.txt

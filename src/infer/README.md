@@ -15,21 +15,23 @@ frames and Flora input constraints. Incomplete segment statuses cause an
 error. UMI videos are passed through unchanged; oversized or otherwise invalid
 videos are reported by Flora rather than silently modified.
 
-The default mode only performs CPU input validation. For example, from the
-repository root, with the two datasets mounted at `/data` and a writable
-output directory mounted at `/outputs`:
+The default mode only performs CPU input validation. Each invocation writes
+its manifest, any prepared media, and inference results (when `--run` is used)
+to a new `<dataset>/flora_annotations/<run-id>/` directory. For example, mount
+the dataset writable and run:
 
 ```sh
-docker run --rm -v /mnt/sdb/jiwu-umi:/data:ro -v "$PWD/outputs:/outputs" \
+docker run --rm -v /mnt/sdb/jiwu-umi:/data \
   jiwu.robotics/robox-datapilot/flora:latest \
   python -m src.infer --kind umi \
   --dataset /data/Robot_data_Bing_20261111_144059 \
-  --output /outputs/umi-check --max-parts 1
+  --max-parts 1
 ```
 
 Use `--kind dagger` with the DAgger path for the head camera. `--episode N`
 selects an episode; `--max-parts 0` (the default for the CLI) processes all
-parts. Use a new output directory for each run. Add `--run`, GPU access and
+parts. Use `--output` to select a different output directory; it must not
+contain an existing manifest. Add `--run`, GPU access and
 model-cache mounts for actual annotation; input validation is always run first.
 The GPU run requires the hardware and cache described in the repository
 `AGENTS.md`. Weight downloads to a new disk require prior approval.
@@ -38,11 +40,14 @@ The GPU run requires the hardware and cache described in the repository
 
 `kestra/jiwu_flora.yaml` targets the DataPilot Kestra Docker-in-Docker runner on
 this host. The runner needs the image imported into its own Docker daemon; its
-`/data/jiwu-dagger`, `/data/jiwu-umi`, and `/var/lib/preprocess-results`
-mounts must exist. The workflow defaults to validating one UMI part on CPU;
+`/data/jiwu-dagger` and `/data/jiwu-umi` mounts must be writable in both the
+outer Docker-in-Docker service and its task container. The current local
+DataPilot runner mounts these paths read-only, so its configuration must be
+changed and the service recreated before this flow can write to the datasets.
+The `/var/lib/preprocess-results` mount is used for the model cache. The
+workflow defaults to validating one UMI part on CPU;
 select `dagger`, set `max_parts` to `0` for all, or set `inference` to `true`
 for GPU inference after arranging an approved cache and suitable GPU. Outputs
-are stored under `/var/lib/preprocess-results/flora/<execution-id>` inside the
-runner, backed by the `robox-datapilot_preprocess-results` Docker volume. The
-GPU task's cache is in the same volume under `flora-model-cache`; it is empty
+are stored under `<dataset>/flora_annotations/<execution-id>`. The GPU task's
+cache is in the results volume under `flora-model-cache`; it is empty
 unless populated separately, and running it can download model weights there.

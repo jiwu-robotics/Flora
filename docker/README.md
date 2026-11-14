@@ -28,3 +28,18 @@ docker compose run --rm flora python captioner/tempseg_infer.py --video /data/ep
 Choose `human`, `yam`, `dex`, or `tianji` to match the video; the example uses the single-camera human profile and does not establish the subject type. The JSON result contains `segments` with `start_s`, `end_s`, and `segmentation_provenance`, plus input hashes and model revisions. Segments can overlap. See `--help` for three-camera and JSONL inputs, `--include-audit`, and overwrite behavior. The upstream pipeline was validated on an 80 GB NVIDIA GPU; see the repository README and model guides for input constraints and license terms.
 
 For timestamped captions instead, replace `captioner/tempseg_infer.py` with `captioner/infer.py` in the commands above. Rewarder uses incompatible dependencies and needs its own environment; it is not installed in this image.
+
+## Make targets
+
+Run `make` or `make help` from the repository root to list the available
+commands. `make image` builds the Compose image and `make image-push` pushes
+it; pushing requires registry access. Pass Compose build options with, for
+example, `make image BUILD_OPTIONS='--no-cache'`.
+
+`make test` runs the adapter's CPU-only unit tests. `make lint`, `make format`,
+`make format-check`, and `make check` use [Ruff](https://docs.astral.sh/ruff/).
+Install Ruff in a separate tools environment or make it available on `PATH`;
+set `RUFF=/path/to/ruff` to choose an executable. These targets cover
+`src/infer`, `tests`, and the Docker Python helpers by default; set
+`PYTHON_PATHS` to select other paths. Vendor directories are excluded. The
+annotation and Rewarder environments remain separate.

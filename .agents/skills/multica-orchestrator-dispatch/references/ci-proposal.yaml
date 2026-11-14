@@ -1,0 +1,328 @@
+schema_version: "1.0"
+proposal:
+  id: multica-orchestration-ci-controls
+  stage: W8
+  decision: ACCEPTED
+  application_state: proposal
+  installed: false
+  live_validation_performed: false
+  target_provider: unresolved
+  supersedes: controls/ci-proposal.yaml#sha256:d2aa7b66821cc6068062feb44996d1e325ab7b79fd68f02cccf00c097b05d55a
+
+provenance:
+  requirements_revision: sha256:3b6caab15839cd7489bf30c23f9598a45fa309a3ade7a6227597ab83cb237d94
+  w7_analysis_revision: sha256:fa7cb25cced83939df9d8ce999f7ac79db62567a05cf0060a6da174d488f717f
+  package_manifest_revision: sha256:9d898b10f1b33a3e6c54eed4239cba220d36a33950f01cf6b1aed57c3114004d
+  handoff_gate_contract_revision: sha256:975dd64c3acbf2ea63803d76e28f4e35779c043547713fbf917f6b235267ecdb
+
+principles:
+  - hard-controls-must-not-depend-on-agent-self-report
+  - baseline-checks-must-run-on-proposed-merge-revision
+  - blocked-failed-or-stale-is-never-success
+  - human-decisions-require-provider-verifiable-human-identity
+  - target-project-commands-must-be-resolved-before-installation
+  - agent-merge-release-tag-and-deployment-remain-denied
+  - gitflow-integration-and-promotion-must-be-provider-readback
+  - cross-work-item-writes-require-scope-and-resource-controls
+  - repository-target-integration-must-be-serialized
+
+baseline_check_set:
+  explicit_integration_dispatch:
+    - orchestration-contract
+    - work-type-isolation
+    - work-item-execution-isolation
+    - cross-work-item-scope-conflict
+    - resource-lease-integrity
+    - integration-target-freshness
+    - artifact-revision-integrity
+    - permission-boundary
+    - human-approval-evidence
+    - project-test
+    - project-lint
+    - project-build
+  optional_by_project:
+    - security-scan
+    - dependency-review
+    - migration-safety
+    - target-environment-verification
+
+controls:
+  - id: CI-ORCH-001
+    check: orchestration-contract
+    purpose: 验证 package、Agent、Squad、Issue、Gate、Handoff、branch/commit schema 和 ledger 闭包
+    inputs:
+      - accepted-package-manifest
+      - workflow-ledger
+      - changed-orchestration-artifacts
+      - operator-local-skill-integrity-verifier-report
+      - proposed-pr-range
+      - branch-and-commit-policy-readback
+      - provider-pr-and-merge-readback
+    assertions:
+      - 所有 manifest 引用存在且 digest 与 accepted revision 一致
+      - 每个 manifest-bound Skill 的 clean source revision、authorized archive、workspace `--with-content` readback 和 exact Agent binding 都由 current integrity verifier 证明相同 canonical content digest
+      - Agent role_key 唯一且每个 Agent 只引用一个独立 Instructions 文件
+      - Feature 与 Fix Squad membership、leader 和 work_type 与 manifest 一致
+      - Gate value 只使用 APPROVED、APPROVED_NA、REJECTED、BLOCKED；运行态可另记 STALE
+      - WorkItemExecutionRef.v4、ExecutionContextRef.v1、LeaderDispatchRef.v1、HandoffRef.v3、ArtifactRef.v2、GateRecord.v2、WorkItemBranchRef.v1、RunCheckoutRef.v1、CheckoutRef.v5、WorkScopeRef、ScopeConflictGate、ChangesetCandidateRef、CommitRef、PullRequestRef、IntegrationAttemptRef、IntegrationRef.v2、PromotionRef、LeaseRecord.v2、MergeResolutionRef.v2 和 HumanDecisionRef 可解析
+      - WorkItemBranchRef.v1 的 canonical Issue key、stable GitFlow integration branch、base/target/head 和 provider receipt 与 current Work Item 精确匹配
+      - RunCheckoutRef.v1/CheckoutRef.v5 的 execution、Runtime task branch、ownership/baseline、root/cwd/session、HEAD、candidate-to-commit mapping、CommitRef lineage 和 Work-Item footer 与 current work item 精确匹配
+      - PullRequestRef source=stable integration branch、target/head 与 current CommitRef 匹配；Feature/Fix target=`develop`，Release/Hotfix primary target=`main`
+      - IntegrationRef.v2 证明 current IntegrationAttempt 的 provider server merge commit、十二个 baseline check 收据、Human approval 和 exact source/target
+      - Release/Hotfix 的 PromotionRef 包含 required back-merge、tag receipt（适用时）及 MergeResolutionRef.v2
+    failure: ORCHESTRATION_CONTRACT_INVALID
+    owner: orchestration-control-owner
+
+  - id: CI-ORCH-002
+    check: work-type-isolation
+    purpose: 防止 Feature 与 Fix execution 身份、Skill 或 current run 交叉
+    inputs:
+      - accepted-package-manifest
+      - applied-agent-readback
+      - applied-squad-readback
+      - workflow-ledger
+    assertions:
+      - shared Agent 不拥有 Feature 或 Fix 业务产物写权限
+      - Feature execution Agent 不绑定 Fix execution Skill
+      - Fix execution Agent 不绑定 Feature execution Skill
+      - 同一 repository/work item 只有一个 current work_type 和一个 current WorkItemExecution epoch
+      - Fix 升级 Feature 后原 Fix execution 已终止；新 Feature 使用不同 execution/checkout/root
+    failure: WORK_TYPE_ISOLATION_BREACH
+    owner: platform-control-owner
+
+  - id: CI-ORCH-003
+    check: artifact-revision-integrity
+    purpose: 阻止 stale、缺失或混合 revision 的下游推进
+    inputs:
+      - workflow-ledger
+      - gate-records
+      - handoff-records
+      - changed-artifacts
+    assertions:
+      - 每个下游 Handoff 输入均指向同一 current execution 和 exact revision
+      - source revision 改变已使所有 source-dependent Gate/Human decisions 失效
+      - target revision 单独前进只使 mergeability/proposed-merge/integration evidence stale，除非 overlap 或验证失败
+      - REJECTED、BLOCKED 或 STALE Gate 不能满足 required gate
+      - tasks.md 与 repository-global resource leases 无冲突
+      - implementation、review、test、final acceptance、PR source head 和 IntegrationAttempt 指向同一 current source lineage
+    failure: ARTIFACT_REVISION_MISMATCH
+    owner: orchestration-control-owner
+
+  - id: CI-ORCH-004
+    check: permission-boundary
+    purpose: 将 W6 write scope 和高风险禁令变成可拒绝的 provider check
+    inputs:
+      - accepted-package-manifest
+      - changed-files
+      - actor-identity
+      - applied-permission-readback
+    assertions:
+      - actor role 对每个 changed path 都有显式 write scope
+      - reviewer 和 verifier 未修改被评审的业务产物
+      - workflow-leader 未修改业务产物
+      - 只有 shared-intake 与 workflow-leader 获得 Multica access
+      - 只有 repository-writing roles 获得 scoped ordinary commit 权限，commit-policy-reviewer 对 Git 只读；没有 Agent 获得自行 branch/worktree create、push、强推、merge、release、tag、deploy、secret 或 workspace-schema 权限
+    failure: PERMISSION_BOUNDARY_VIOLATION
+    owner: repository-and-platform-admin
+
+  - id: CI-ORCH-005
+    check: human-approval-evidence
+    purpose: 验证所有不可代理的人类决定存在、由当前指定 Human 作出且 revision 精确
+    inputs:
+      - workflow-ledger
+      - human-designation-record
+      - current-artifact-revisions
+    assertions:
+      - required HumanDecisionRef 的 actor_type 为 human，且 human_email 匹配 current HumanDesignationRef
+      - HumanDesignationRef 在 Feature Specify/治理输入或 Fix Assess 前 current，且只有 `multica auth status` 所示的 account email 和 explicit consent 作为 designation 前提
+      - constitution、architecture、adr、roadmap 和 tasks 分项决定均绑定实际 diff/revision
+      - implementation-route 在首次源码写入前产生且只有一个 current route
+      - Loop sign-off 包含 checker verdict、debt、预算和风险
+      - final acceptance 指向 current implementation、CommitRef 与全部 required verification
+      - Release/Hotfix promotion 与 MergeResolutionRef（适用时）都绑定真实 Human decision 和 exact revisions
+      - 不要求 provider role binding、Project Owner、authorization receipt 或 provider identity readback
+    failure: HUMAN_APPROVAL_EVIDENCE_INVALID
+    owner: human-authority-and-operator
+
+  - id: CI-ORCH-006
+    check: project-test
+    purpose: 执行目标项目的必需行为测试
+    command_source: target-project-maintained-ci-contract
+    command: unresolved
+    resolution_required_before_installation: true
+    assertions:
+      - 命令由目标项目维护而不是由 Agent 临场选择
+      - 在 proposed merge revision 上实际执行
+      - skipped、not-run、flaky-ignore 或 partial 不算通过
+    failure: PROJECT_TEST_FAILED
+    owner: repository-maintainer
+
+  - id: CI-ORCH-007
+    check: project-lint
+    purpose: 执行目标项目声明的 lint、format-check 或 static-analysis 合同
+    command_source: target-project-maintained-ci-contract
+    command: unresolved
+    resolution_required_before_installation: true
+    assertions:
+      - 适用命令和允许的 N/A 条件由目标项目维护
+      - N/A 必须有 Human/maintainer 记录，不能由 Maker 自行决定
+    failure: PROJECT_LINT_FAILED
+    owner: repository-maintainer
+
+  - id: CI-ORCH-008
+    check: project-build
+    purpose: 执行目标项目声明的 build、typecheck 或 package 验证合同
+    command_source: target-project-maintained-ci-contract
+    command: unresolved
+    resolution_required_before_installation: true
+    assertions:
+      - 适用 build matrix 覆盖受影响 surface
+      - 缺 toolchain、依赖或 runner 为 BLOCKED，不得假 PASS
+    failure: PROJECT_BUILD_FAILED
+    owner: repository-maintainer
+
+  - id: CI-ORCH-009
+    check: implementation-route-integrity
+    folded_into: orchestration-contract
+    purpose: 强制每个 Feature 恰好一个实现 route
+    assertions:
+      - Core 与 Loop 不得同时拥有 current changeset
+      - default_worktree 为 true 时 Loop isolation 必须为 none
+      - Loop maker、checker、guard、shared state 和 budget 全部存在或 Loop 整体禁用
+      - iteration checker 与 maker 身份和 session 独立
+    failure: IMPLEMENTATION_ROUTE_INVALID
+    owner: orchestration-control-owner
+
+  - id: CI-ORCH-010
+    check: portable-secret-safety
+    folded_into: permission-boundary
+    purpose: 防止模板或证据泄漏不可移植信息
+    assertions:
+      - 不包含 credential、token、cookie、private key 或 CLI secret
+      - reusable template 不包含 workspace UUID、账号、server、私有地址或绝对机器路径
+      - 凭据只通过 runtime secret binding 注入 A01/A02
+    failure: PORTABILITY_OR_SECRET_VIOLATION
+    owner: security-and-platform-admin
+
+  - id: CI-ORCH-011
+    check: work-item-execution-isolation
+    purpose: 阻止不同 Work Item 共用 execution、checkout root、session 或 mutable state
+    inputs:
+      - workflow-ledger
+      - active-run-readback
+      - checkout-runtime-readback
+    assertions:
+      - 每个 repository/work-item 只有一个 current WorkItemExecutionRef
+      - 每个 current Work Item 有不同 branch、CheckoutRef.root、cwd/session 和 state namespace
+      - Handoff、Gate、artifact、notification 和 candidate 的 execution_ref 一致
+      - duplicate retry 不产生第二个 current/active/queued epoch
+    failure: MULTI_WORK_ITEM_EXECUTION_ISOLATION_UNVERIFIED
+    owner: runtime-and-orchestration-control-owner
+
+  - id: CI-ORCH-012
+    check: cross-work-item-scope-conflict
+    purpose: 在首次源码写前阻止 path/resource/dependency overlap
+    inputs:
+      - current-work-scope-registry
+      - active-work-items
+      - dependency-and-integration-refs
+    assertions:
+      - 每个 source writer 有 current WorkScopeRef
+      - 每个 active WorkScope 与其他 current scopes 已按 path/resource/dependency 比较
+      - 只有 ScopeConflictGate=CLEAR 可进入 writer
+      - serialize/dependency/Human resolution 有 exact ref，不能用不同目录或不同 Agent 身份代替
+    failure: WORK_SCOPE_CONFLICT_UNRESOLVED
+    owner: workflow-leader-and-repository-provider
+
+  - id: CI-ORCH-013
+    check: resource-lease-integrity
+    purpose: 强制 repository-global resource 和 tasks path 的原子 single-writer 约束
+    inputs:
+      - workflow-ledger
+      - active-lease-records
+      - changed-resource-keys
+    assertions:
+      - 每个 EXCLUSIVE_WRITE resource key 最多一个 ACTIVE holder
+      - APPEND_ONLY 与 EXCLUSIVE_WRITE 冲突时没有并发 writer
+      - lease acquire/release 使用 expected revision compare-and-set
+      - timeout 不自动释放；terminal holder、provider/Human revoke 或 current holder readback 才允许回收
+    failure: RESOURCE_LEASE_CONTROL_UNVERIFIED
+    owner: repository-provider
+
+  - id: CI-ORCH-014
+    check: integration-target-freshness
+    purpose: 串行 repository target integration并验证 exact source/target proposed merge result
+    inputs:
+      - integration-queue-readback
+      - current-integration-attempt
+      - pull-request-source-target
+      - proposed-merge-check-receipts
+    assertions:
+      - 每个 repository/target 最多一个 EVALUATING、READY 或 MERGING attempt
+      - attempt source head 等于 current CommitRef，target revision 等于实际最新 target head
+      - target 前进使旧 attempt 和 checks stale并创建 superseding attempt
+      - provider merge receipt、Human approval 和全部十二个 check receipts 绑定同一 attempt
+    failure: INTEGRATION_QUEUE_UNVERIFIED
+    owner: repository-provider-and-human-integration-operator
+
+status_semantics:
+  issue_statuses:
+    needs_triage: backlog
+    needs_information: blocked
+    ready_for_agent: backlog
+    ready_for_human: todo
+    wontfix: cancelled
+  forbidden_as_gate_values:
+    - needs_triage
+    - needs_information
+    - ready_for_agent
+    - ready_for_human
+    - wontfix
+  dispatch_rule: ready_for_agent 不启动 run；只有显式 dispatch 才允许启动唯一入口
+
+fleet_application_contract:
+  required_resolutions:
+    - fixed-orchestrator-source
+    - target-provider-and-repository
+    - project-test-command-and-matrix
+    - project-lint-command-or-approved-na-policy
+    - project-build-command-or-approved-na-policy
+    - single-collaboration-runtime-and-in-place-root-readback
+    - one-active-work-item-per-real-root
+    - serialized-agent-runs-and-atomic-workflow-ledger
+    - repository-global-resource-lease-control
+    - repository-target-integration-queue
+    - atomic-human-notification-reservation
+  validation_after_application:
+    - 读取实际 Agent、Squad、Skill 和 permission 配置并与 manifest 比较
+    - 读取 fixed source、target runtime/model、Project/repository 与 Skill integrity readback
+  dispatch_contract:
+    required_resolutions:
+      - gitflow-branch-provisioning-and-checkout-v4-readback
+      - active-release-branch-discovery
+      - work-item-execution-admission-and-run-deduplication
+      - per-run-cwd-session-checkout-root-isolation
+      - scope-registry-conflict-gate-and-resource-lease
+      - provider-pr-integration-attempt-and-queue-capability
+      - artifact-ledger-location-compare-and-set-reader
+      - human-designation-email-and-consent-confirmation
+      - human-decision-ledger-schema
+      - atomic-human-notification-reservation-and-receipt
+      - conventional-commit-hook-and-pr-range-validator-readback
+      - repository-writer-scoped-commit-permissions-and-commit-policy-reviewer-read-only-permission
+      - check-adapter-and-twelve-baseline-check-receipt-capability
+    validation_before_first_dispatch:
+      - 每个 Work Item 的 execution、branch、checkout root、cwd/session 和 state namespace 可独立 readback
+      - workflow ledger、scope registry、resource lease 和 notification reservation 的 compare-and-set 可验证
+      - 同一 Work Item 的顺序 writer runs 延续同一 provider-managed branch lineage，且无 overlapping writer
+      - provider-pr-server-merge-and-integration-queue-readback
+      - release-hotfix-promotion-and-backmerge-readback
+      - 在每个 integration 前核对十二个 baseline check 的同一 exact source/target 收据
+      - 读取 operator-local Human designation 与 decision ledger 格式并验证 email matching、consent、exact revision 与 supersession
+      - 在授权的 disposable revision 上证明每个 check 真实运行
+  forbidden_validation_shortcuts:
+    - 创建 live 测试 Issue
+    - dispatch Agent 或 Squad
+    - 修改 live workspace schema
+    - 把配置文件存在当作安装成功
+    - 把本 proposal 当作 Human designation 或 decision evidence

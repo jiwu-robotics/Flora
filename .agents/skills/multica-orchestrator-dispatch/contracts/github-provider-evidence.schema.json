@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-dispatch.github-provider-evidence.v2",
+  "title": "GitHubProviderEvidence.v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "repository", "pull_request", "current_target_head", "checks_revision", "checks", "observed_at", "evidence_digest"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator-dispatch.github-provider-evidence.v2"},
+    "repository": {"type": "string", "pattern": "^[^/]+/[^/]+$"},
+    "pull_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["number", "url", "state", "source_ref", "source_head", "target_ref", "target_head_at_validation", "merge_head"],
+      "properties": {
+        "number": {"type": "integer", "minimum": 1},
+        "url": {"type": "string", "format": "uri"},
+        "state": {"type": "string"},
+        "source_ref": {"type": "string", "minLength": 1},
+        "source_head": {"$ref": "#/$defs/revision"},
+        "target_ref": {"type": "string", "minLength": 1},
+        "target_head_at_validation": {"$ref": "#/$defs/revision"},
+        "merge_head": {"oneOf": [{"$ref": "#/$defs/revision"}, {"type": "null"}]}
+      }
+    },
+    "current_target_head": {"$ref": "#/$defs/revision"},
+    "checks_revision": {"$ref": "#/$defs/revision"},
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "status", "conclusion", "details_url", "workflow_name"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "status": {"type": ["string", "null"]},
+          "conclusion": {"type": ["string", "null"]},
+          "details_url": {"type": ["string", "null"]},
+          "workflow_name": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "observed_at": {"type": "string", "format": "date-time"},
+    "evidence_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

@@ -1,0 +1,1 @@
+"""Relocate stage implementation."""

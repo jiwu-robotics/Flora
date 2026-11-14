@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator.server-application-input.v7",
+  "title": "Server orchestration application input v7",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "bundle_store", "workspace_handoff_bundle", "consumer_session", "collaboration_runtime_alias", "agents"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator.server-application-input.v7"},
+    "bundle_store": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state_root"],
+      "properties": {
+        "state_root": {"type": "string", "pattern": "^/"}
+      }
+    },
+    "workspace_handoff_bundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest_digest"],
+      "properties": {
+        "manifest_digest": {"pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "consumer_session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "account_ref"],
+      "properties": {
+        "profile": {"type": "string", "minLength": 1},
+        "account_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "collaboration_runtime_alias": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+    },
+    "agents": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "shared-intake", "workflow-leader", "commit-policy-reviewer",
+        "feature-governance-producer", "feature-requirement-producer",
+        "feature-requirement-reviewer", "feature-planning-producer",
+        "feature-reviewer", "feature-core-maker", "feature-loop-maker",
+        "feature-loop-checker", "feature-loop-guard",
+        "feature-convergence-reviewer", "fix-assessor", "fix-maker",
+        "fix-verifier"
+      ],
+      "properties": {
+        "shared-intake": {"$ref": "#/$defs/agent"},
+        "workflow-leader": {"$ref": "#/$defs/agent"},
+        "commit-policy-reviewer": {"$ref": "#/$defs/agent"},
+        "feature-governance-producer": {"$ref": "#/$defs/agent"},
+        "feature-requirement-producer": {"$ref": "#/$defs/agent"},
+        "feature-requirement-reviewer": {"$ref": "#/$defs/agent"},
+        "feature-planning-producer": {"$ref": "#/$defs/agent"},
+        "feature-reviewer": {"$ref": "#/$defs/agent"},
+        "feature-core-maker": {"$ref": "#/$defs/agent"},
+        "feature-loop-maker": {"$ref": "#/$defs/agent"},
+        "feature-loop-checker": {"$ref": "#/$defs/agent"},
+        "feature-loop-guard": {"$ref": "#/$defs/agent"},
+        "feature-convergence-reviewer": {"$ref": "#/$defs/agent"},
+        "fix-assessor": {"$ref": "#/$defs/agent"},
+        "fix-maker": {"$ref": "#/$defs/agent"},
+        "fix-verifier": {"$ref": "#/$defs/agent"}
+      }
+    }
+  },
+  "$defs": {
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "thinking_level", "max_concurrent_tasks", "permission_mode"],
+      "properties": {
+        "model": {"type": "string", "minLength": 1},
+        "thinking_level": {"type": ["string", "null"]},
+        "max_concurrent_tasks": {"const": 1},
+        "permission_mode": {"const": "private"}
+      }
+    }
+  }
+}

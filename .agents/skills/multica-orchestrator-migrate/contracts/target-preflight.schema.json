@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-migrate.target-preflight.v3",
+  "title": "TargetPreflight.v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "input_digest", "release_candidate_digest", "project_bundle_manifest_digest", "native_squad_dispatch_digest", "targets", "observed_at", "snapshot_digest"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator-migrate.target-preflight.v3"},
+    "input_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "release_candidate_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "project_bundle_manifest_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "native_squad_dispatch_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "targets": {"type": "array", "items": {"type": "object"}},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "snapshot_digest": {"pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

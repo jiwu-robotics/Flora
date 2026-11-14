@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator.server-reissue-spec.v1",
+  "title": "Portable Server orchestration reissue specification v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "package", "collaboration_runtime_alias", "agent_configuration", "skill_bindings", "squads", "spec_digest"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator.server-reissue-spec.v1"},
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "manifest_digest"],
+      "properties": {
+        "id": {"const": "multica-super-individual-orchestration"},
+        "version": {"type": "string", "minLength": 1},
+        "manifest_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "collaboration_runtime_alias": {"type": "string", "minLength": 1},
+    "agent_configuration": {"type": "object", "minProperties": 1},
+    "skill_bindings": {"type": "object", "minProperties": 1},
+    "squads": {"type": "object", "minProperties": 1},
+    "spec_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

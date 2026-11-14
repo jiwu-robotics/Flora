@@ -1,0 +1,5 @@
+interface:
+  display_name: "Spec Kit Upgrade Refs"
+  short_description: "Sync parent main, fork main, and fork develop safely"
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Multica Migrate Server"
+  short_description: "Migrate a self-hosted Multica service with verified data restore and cutover"
+policy:
+  allow_implicit_invocation: false

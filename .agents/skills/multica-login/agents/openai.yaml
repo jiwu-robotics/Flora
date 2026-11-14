@@ -1,0 +1,6 @@
+interface:
+  display_name: "Multica Login"
+  short_description: "Plan, authenticate, and verify Multica clients"
+  default_prompt: "Use $multica-login to plan this login, verify the pinned browser capability when needed, authenticate one client, and produce phased readback receipts without creating resources."
+policy:
+  allow_implicit_invocation: false

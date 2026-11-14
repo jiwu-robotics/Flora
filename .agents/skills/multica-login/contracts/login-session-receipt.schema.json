@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-login.session-receipt.v1",
+  "title": "MulticaLoginSessionReceipt.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "plan_digest", "previous_receipt_digest", "sequence", "state", "evidence_digest", "observed_at", "receipt_digest"],
+  "properties": {
+    "schema": {"const": "multica-login.session-receipt.v1"},
+    "plan_digest": {"$ref": "#/$defs/digest"},
+    "previous_receipt_digest": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+    "sequence": {"type": "integer", "minimum": 0},
+    "state": {"enum": ["planned", "endpoint_verified", "browser_authenticated", "cli_authenticated", "workspace_selected", "runtime_ready"]},
+    "evidence_digest": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "receipt_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {"digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}
+}

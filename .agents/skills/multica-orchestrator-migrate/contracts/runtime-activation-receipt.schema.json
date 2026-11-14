@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator.runtime-activation-receipt.v2",
+  "title": "RuntimeActivationReceipt.v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "wire", "runtime_alias", "project_key", "generation", "release_candidate_digest", "project_bundle_manifest_digest", "native_squad_dispatch_digest", "workspace_ref", "runtime_ref", "daemon_ref", "repository_identity", "command_profile", "local_directory_resource_ref", "execution_mode", "worktree_capability_revision", "verification", "state", "verified_at", "receipt_digest"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator.runtime-activation-receipt.v2"},
+    "wire": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "canonicalization", "embedded_field"],
+      "properties": {
+        "algorithm": {"const": "sha256"},
+        "canonicalization": {"const": "json-compact-sorted-utf8-v1"},
+        "embedded_field": {"const": "receipt_digest"}
+      }
+    },
+    "runtime_alias": {"type": "string", "minLength": 1},
+    "project_key": {"$ref": "#/$defs/digest"},
+    "generation": {"type": "integer", "minimum": 1},
+    "release_candidate_digest": {"$ref": "#/$defs/digest"},
+    "project_bundle_manifest_digest": {"$ref": "#/$defs/digest"},
+    "native_squad_dispatch_digest": {"$ref": "#/$defs/digest"},
+    "workspace_ref": {"type": "string", "minLength": 1},
+    "runtime_ref": {"type": "string", "minLength": 1},
+    "daemon_ref": {"type": "string", "minLength": 1},
+    "repository_identity": {"type": "string", "minLength": 1},
+    "command_profile": {"type": "string", "minLength": 1},
+    "local_directory_resource_ref": {"type": "string", "minLength": 1},
+    "execution_mode": {"const": "worktree"},
+    "worktree_capability_revision": {"$ref": "#/$defs/digest"},
+    "verification": {
+      "type": "object",
+      "required": ["native_squad_cli_capabilities_digest", "execution_mode", "worktree_capability_revision"],
+      "properties": {
+        "native_squad_cli_capabilities_digest": {"$ref": "#/$defs/digest"},
+        "execution_mode": {"const": "worktree"},
+        "worktree_capability_revision": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "state": {"const": "ACTIVATED"},
+    "verified_at": {"type": "string", "format": "date-time"},
+    "receipt_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {"digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}
+}

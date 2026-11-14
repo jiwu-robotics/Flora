@@ -1,0 +1,5 @@
+interface:
+  display_name: "Repo Flow"
+  short_description: "Coordinate commits, GitFlow PRs, merges, and releases safely"
+policy:
+  allow_implicit_invocation: false

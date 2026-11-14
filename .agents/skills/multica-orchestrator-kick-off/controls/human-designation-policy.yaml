@@ -1,0 +1,75 @@
+schema_version: "1.0"
+policy:
+  id: multica-orchestration-human-designation-policy
+  decision: PROPOSED
+  application_state: proposal
+  portable: true
+  live_designations_present: false
+  description: >-
+    A Human is designated for a target Project by the authenticated Multica
+    account email from `multica auth status` and that Human's explicit consent.
+    Multica Project Lead is not used as a permission or approval role.
+
+subjects:
+  - governance-input
+  - constitution
+  - architecture
+  - adr
+  - roadmap
+  - tasks
+  - implementation-route
+  - loop-signoff
+  - risk-override
+  - final-acceptance
+
+designation:
+  authenticated_multica_account_required: true
+  email_source: multica-auth-status
+  email_required: true
+  explicit_consent_required: true
+  applies_to_all_subjects: true
+  per_project_designation: true
+  work_item_override_requires_new_consent: true
+  designation_must_be_current_before:
+    - feature-governance-input
+    - feature-specify
+    - fix-assess
+  revocation_or_change_invalidates_pending_requests: true
+  accepted_decisions_remain_historical: true
+
+participation:
+  tracked_template_contract: multica-orchestrator-nail-down/human-participation-plan.v1
+  filled_plan_operator_local: true
+  current_plan_required_before_first_producer: true
+  recipient_must_resolve_to_designation_email: true
+  recipient_is_not_human_selector: true
+  notification_actor: workflow-leader
+  automatic_initial_notification: true
+  atomic_initial_reservation_required: true
+  reservation_key_includes:
+    - project-ref
+    - work-item-ref
+    - execution-ref
+    - subject
+    - designation-ref
+    - participation-plan-ref
+    - sorted-input-revisions
+  provider_scheduled_reminders_max: 2
+  notification_readback_required: true
+  notification_or_timeout_is_not_decision: true
+  human_decision_automatically_starts_agent: false
+  forbidden_notification_targets:
+    - agent
+    - squad
+    - all
+
+security:
+  agents_may_not_designate_or_consent: true
+  silence_or_timeout_is_not_consent: true
+  portable_policy_must_not_contain:
+    - workspace-uuid
+    - project-id
+    - member-id
+    - account-name
+    - email
+    - credential

@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-link-up.workspace-foundation-input.v3",
+  "title": "Workspace foundation input v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "operator_state_root", "server", "workspace", "labels", "statuses", "runtime_fleet", "orchestration_capabilities"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator-link-up.workspace-foundation-input.v3"},
+    "operator_state_root": {"type": "string", "pattern": "^/"},
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref", "profile", "account_ref"],
+      "properties": {
+        "kind": {"enum": ["cloud", "self-hosted"]},
+        "ref": {"type": "string", "minLength": 1},
+        "deployment_key": {"pattern": "^sha256:[0-9a-f]{64}$"},
+        "relocation_intent_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+        "profile": {"type": "string", "minLength": 1},
+        "account_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "exists"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "exists": {"type": "boolean"},
+        "workspace_ref": {"type": ["string", "null"]},
+        "slug": {"type": "string", "minLength": 1},
+        "issue_prefix": {"type": "string", "minLength": 1}
+      }
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bug", "enhancement"],
+      "properties": {
+        "bug": {"$ref": "#/$defs/label"},
+        "enhancement": {"$ref": "#/$defs/label"}
+      }
+    },
+    "statuses": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["needs_triage", "needs_information", "ready_for_agent", "ready_for_human", "wontfix"],
+      "properties": {
+        "needs_triage": {"$ref": "#/$defs/status"},
+        "needs_information": {"$ref": "#/$defs/status"},
+        "ready_for_agent": {"$ref": "#/$defs/status"},
+        "ready_for_human": {"$ref": "#/$defs/status"},
+        "wontfix": {"$ref": "#/$defs/status"}
+      }
+    },
+    "runtime_fleet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtimes"],
+      "properties": {
+        "runtimes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/runtime"}
+        }
+      }
+    },
+    "orchestration_capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "evidence_ref", "native_squad_routing"],
+      "properties": {
+        "state": {"enum": ["VERIFIED", "BLOCKED"]},
+        "evidence_ref": {"type": "string", "minLength": 1},
+        "native_squad_routing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["leader_first_surface", "exact_member_routing_surface", "no_start_assignment_surface", "thread_reply_surface", "run_readback_surface", "membership_role_surface", "private_agent_surface"],
+          "properties": {
+            "leader_first_surface": {"type": "boolean"},
+            "exact_member_routing_surface": {"type": "boolean"},
+            "no_start_assignment_surface": {"type": "boolean"},
+            "thread_reply_surface": {"type": "boolean"},
+            "run_readback_surface": {"type": "boolean"},
+            "membership_role_surface": {"type": "boolean"},
+            "private_agent_surface": {"type": "boolean"}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "label": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exists", "color"],
+      "properties": {
+        "exists": {"type": "boolean"},
+        "color": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"},
+        "label_ref": {"type": ["string", "null"]}
+      }
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "evidence_ref"],
+      "properties": {
+        "state": {"enum": ["VERIFIED", "PENDING_CONFIRMATION", "CONFLICT"]},
+        "evidence_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alias", "name", "exists", "runtime_ref", "daemon_ref", "status", "provider", "capability_revision", "daemon_start_required"],
+      "properties": {
+        "alias": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"},
+        "name": {"type": "string", "minLength": 1},
+        "exists": {"type": "boolean"},
+        "runtime_ref": {"type": ["string", "null"]},
+        "daemon_ref": {"type": ["string", "null"]},
+        "status": {"enum": ["online", "offline", "missing"]},
+        "provider": {"type": ["string", "null"]},
+        "capability_revision": {"type": ["string", "null"]},
+        "daemon_start_required": {"type": "boolean"},
+        "profile": {"$ref": "#/$defs/runtimeProfile"}
+      }
+    },
+    "runtimeProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["display_name", "command_name", "protocol_family", "exists"],
+      "properties": {
+        "display_name": {"type": "string", "minLength": 1},
+        "command_name": {"type": "string", "minLength": 1},
+        "protocol_family": {"type": "string", "minLength": 1},
+        "exists": {"type": "boolean"}
+      }
+    }
+  }
+}

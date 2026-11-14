@@ -1,0 +1,6 @@
+{
+  "core_workflow": "core --full",
+  "package": "agent-browser",
+  "schema": "multica-login.browser-runtime-lock.v1",
+  "version": "0.37.1"
+}

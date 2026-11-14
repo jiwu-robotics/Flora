@@ -1,0 +1,5 @@
+interface:
+  display_name: "Multica Orchestrator"
+  short_description: "Configure reusable workspace Skills, Agents, and Squads"
+policy:
+  allow_implicit_invocation: false

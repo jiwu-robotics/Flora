@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-login.plan.v1",
+  "title": "MulticaLoginPlan.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "input_digest", "target", "client", "workspace_selector", "execution_requested", "callback_mode", "api_transport", "phases", "blockers", "state", "planned_at", "plan_digest"],
+  "properties": {
+    "schema": {"const": "multica-login.plan.v1"},
+    "input_digest": {"$ref": "#/$defs/digest"},
+    "target": {"type": "object"},
+    "client": {"type": "object"},
+    "workspace_selector": {"type": "object"},
+    "execution_requested": {"type": "boolean"},
+    "callback_mode": {"enum": ["desktop_application_callback", "direct_loopback_callback", "ssh_tunnel_loopback_callback", "direct_callback_probe_required", "private_prompt_pat"]},
+    "api_transport": {"enum": ["direct_api", "ssh_tunnel_api", "blocked"]},
+    "phases": {"type": "array", "minItems": 4, "maxItems": 5, "items": {"type": "object", "additionalProperties": false, "required": ["state", "proof"], "properties": {"state": {"enum": ["endpoint_verified", "browser_authenticated", "cli_authenticated", "workspace_selected", "runtime_ready"]}, "proof": {"type": "string", "minLength": 1}}}},
+    "blockers": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "state": {"enum": ["PLANNED", "BLOCKED"]},
+    "planned_at": {"type": "string", "format": "date-time"},
+    "plan_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {"digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}
+}

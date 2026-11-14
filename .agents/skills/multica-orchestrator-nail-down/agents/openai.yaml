@@ -1,0 +1,5 @@
+interface:
+  display_name: "Multica Orchestrator Nail Down"
+  short_description: "Bind a verified Multica orchestrator to one repository"
+policy:
+  allow_implicit_invocation: false

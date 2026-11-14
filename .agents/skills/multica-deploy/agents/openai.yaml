@@ -1,0 +1,5 @@
+interface:
+  display_name: "Multica Deploy"
+  short_description: "Deploy and verify Multica self-hosted services with safe private or public HTTPS"
+policy:
+  allow_implicit_invocation: false

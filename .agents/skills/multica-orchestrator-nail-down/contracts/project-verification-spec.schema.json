@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator.project-verification-spec.v8",
+  "title": "ProjectVerificationSpec.v8",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "deployment_key",
+    "relocation_intent_digest",
+    "project_key",
+    "workspace_ref",
+    "project_ref",
+    "repository_identity",
+    "repository_policy_digest",
+    "command_profiles_digest",
+    "runtime_target_policy_digest",
+    "native_squad_dispatch_digest",
+    "dispatch_contract_digest"
+  ],
+  "properties": {
+    "schema": {
+      "const": "multica-orchestrator.project-verification-spec.v8"
+    },
+    "deployment_key": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "relocation_intent_digest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "project_key": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "workspace_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "repository_identity": {
+      "type": "string",
+      "pattern": "^github:[^/]+/[^/]+$"
+    },
+    "repository_policy_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "command_profiles_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "runtime_target_policy_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "native_squad_dispatch_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "dispatch_contract_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+# Replace multica.internal.example with the authorized private DNS name.
+# Use with docker-compose.caddy-private-dual.yml for LAN/VPN split DNS.
+# `tls internal` creates a Caddy local CA; distribute its root certificate to
+# clients through an approved private channel before browser or CLI use.
+multica.internal.example {
+    tls internal
+
+    handle /health {
+        reverse_proxy backend:8080
+    }
+
+    handle /readyz {
+        reverse_proxy backend:8080
+    }
+
+    handle /ws {
+        reverse_proxy backend:8080 {
+            flush_interval -1
+        }
+    }
+
+    handle /api/daemon/ws {
+        reverse_proxy backend:8080 {
+            flush_interval -1
+        }
+    }
+
+    handle {
+        reverse_proxy frontend:3000
+    }
+}

@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-relocate.project-receipt.v2",
+  "title": "ProjectRelocationReceipt.v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "plan_digest",
+    "relocation_intent_digest",
+    "old_project_key",
+    "new_project_key",
+    "old_project_bundle_manifest_digest",
+    "new_project_bundle_manifest_digest",
+    "old_active_release_digest",
+    "new_active_release_digest",
+    "repository_identity",
+    "project_subpath",
+    "runtime_receipts",
+    "state",
+    "verified_at",
+    "receipt_digest"
+  ],
+  "properties": {
+    "schema": {
+      "const": "multica-orchestrator-relocate.project-receipt.v2"
+    },
+    "plan_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "relocation_intent_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "old_project_key": {
+      "$ref": "#/$defs/digest"
+    },
+    "new_project_key": {
+      "$ref": "#/$defs/digest"
+    },
+    "old_project_bundle_manifest_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "new_project_bundle_manifest_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "old_active_release_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "new_active_release_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "repository_identity": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_subpath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runtime_receipts": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/digest"
+      }
+    },
+    "state": {
+      "const": "ACTIVE"
+    },
+    "verified_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "receipt_digest": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

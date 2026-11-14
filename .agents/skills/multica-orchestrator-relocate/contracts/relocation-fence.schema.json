@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-relocate.fence.v2",
+  "title": "RelocationFence.v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "deployment_key", "generation", "transaction_digest", "source_index_digest", "target_inventory_digest", "state", "updated_at"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator-relocate.fence.v2"},
+    "deployment_key": {"$ref": "#/$defs/digest"},
+    "generation": {"type": "integer", "minimum": 1},
+    "transaction_digest": {"$ref": "#/$defs/digest"},
+    "source_index_digest": {"$ref": "#/$defs/digest"},
+    "target_inventory_digest": {"$ref": "#/$defs/digest"},
+    "state": {"enum": ["OPEN", "IN_PROGRESS", "COMMITTED", "BLOCKED"]},
+    "authorization_ref": {"type": "string", "minLength": 1},
+    "updated_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {"digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}
+}

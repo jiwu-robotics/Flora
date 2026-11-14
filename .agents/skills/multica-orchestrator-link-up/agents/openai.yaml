@@ -1,0 +1,5 @@
+interface:
+  display_name: "Multica Orchestrator Link Up"
+  short_description: "Configure the reusable Multica workspace foundation"
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,376 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator.server-orchestration-ref.v10",
+  "title": "ServerOrchestrationRef.v10",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "workspace_foundation_ref",
+    "server_ref",
+    "server_kind",
+    "deployment_key",
+    "workspace_key",
+    "relocation_intent_digest",
+    "producer_session",
+    "workspace_ref",
+    "package",
+    "runtime_fleet",
+    "skills",
+    "agents",
+    "squads",
+    "orchestrator_controls",
+    "verification",
+    "desired_state",
+    "project_binding_contract",
+    "dispatch_contract",
+    "state",
+    "dispatch_state",
+    "produced_at"
+  ],
+  "properties": {
+    "schema": {
+      "const": "multica-orchestrator.server-orchestration-ref.v10"
+    },
+    "workspace_foundation_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bundle_manifest_digest",
+        "artifact_digest"
+      ],
+      "properties": {
+        "bundle_manifest_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "artifact_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "server_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "server_kind": {
+      "enum": [
+        "cloud",
+        "self-hosted"
+      ]
+    },
+    "deployment_key": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "workspace_key": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "relocation_intent_digest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "producer_session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_ref",
+        "authenticated_account_ref"
+      ],
+      "properties": {
+        "profile_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authenticated_account_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "workspace_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "manifest_digest",
+        "contract_version"
+      ],
+      "properties": {
+        "id": {
+          "const": "multica-super-individual-orchestration"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifest_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "contract_version": {
+          "const": "10"
+        }
+      }
+    },
+    "runtime_fleet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "membership_digest",
+        "placements_digest",
+        "runtimes"
+      ],
+      "properties": {
+        "membership_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "placements_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "runtimes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "alias",
+              "runtime_ref",
+              "daemon_ref",
+              "status",
+              "provider",
+              "capability_revision"
+            ],
+            "properties": {
+              "alias": {
+                "type": "string",
+                "minLength": 1
+              },
+              "runtime_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "daemon_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "const": "online"
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "capability_revision": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "skills": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package_digest",
+        "bindings_digest",
+        "integrity_report_digest"
+      ],
+      "properties": {
+        "package_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "bindings_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "integrity_report_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "agents": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role_map_digest",
+        "configuration_digest",
+        "placement_digest",
+        "count",
+        "collaboration_runtime_alias"
+      ],
+      "properties": {
+        "role_map_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "configuration_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "placement_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "count": {
+          "const": 16
+        },
+        "collaboration_runtime_alias": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "squads": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "configuration_digest",
+        "membership_digest",
+        "names"
+      ],
+      "properties": {
+        "configuration_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "membership_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "names": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "feature"
+            },
+            {
+              "const": "fix"
+            }
+          ],
+          "items": false
+        }
+      }
+    },
+    "orchestrator_controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "skill_integrity",
+        "permission_readback",
+        "concurrency_readback",
+        "runtime_placement_readback"
+      ],
+      "properties": {
+        "skill_integrity": {
+          "const": "VERIFIED"
+        },
+        "permission_readback": {
+          "const": "VERIFIED"
+        },
+        "concurrency_readback": {
+          "const": "VERIFIED"
+        },
+        "runtime_placement_readback": {
+          "const": "VERIFIED"
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "readback_snapshot_digest",
+        "server_verification_report_digest",
+        "server_verification_spec_digest",
+        "skill_integrity_report_digest",
+        "application_input_digest"
+      ],
+      "properties": {
+        "readback_snapshot_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "server_verification_report_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "server_verification_spec_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "skill_integrity_report_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "application_input_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "desired_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reissue_spec_digest",
+        "agent_configuration_digest",
+        "skill_bindings_digest",
+        "squad_configuration_digest"
+      ],
+      "properties": {
+        "reissue_spec_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "agent_configuration_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "skill_bindings_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "squad_configuration_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "project_binding_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_skill",
+        "minimum_contract_version"
+      ],
+      "properties": {
+        "required_skill": {
+          "const": "multica-orchestrator-nail-down"
+        },
+        "minimum_contract_version": {
+          "const": "11"
+        }
+      }
+    },
+    "state": {
+      "const": "ORCHESTRATOR_LAYER_VERIFIED"
+    },
+    "dispatch_state": {
+      "const": "BLOCKED_PROJECT_BINDING"
+    },
+    "produced_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "dispatch_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_skill",
+        "minimum_contract_version"
+      ],
+      "properties": {
+        "required_skill": {
+          "const": "multica-orchestrator-dispatch"
+        },
+        "minimum_contract_version": {
+          "const": "1"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-relocate.plan.v1",
+  "title": "RelocationPlan.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "input_digest", "snapshot_digest", "migration_receipt_digest", "deployment_key", "operations", "blockers", "state", "plan_digest"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator-relocate.plan.v1"},
+    "input_digest": {"$ref": "#/$defs/digest"},
+    "snapshot_digest": {"$ref": "#/$defs/digest"},
+    "migration_receipt_digest": {"$ref": "#/$defs/digest"},
+    "deployment_key": {"$ref": "#/$defs/digest"},
+    "operations": {
+      "type": "array", "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "kind", "precondition_digest", "authorization_required"],
+        "properties": {"id": {"type": "string", "minLength": 1}, "kind": {"enum": ["acquire-fence", "reissue-foundation", "reissue-server", "reissue-project", "sync-runtime-closure", "activate-release", "commit-index", "verify-relocation"]}, "subject": {"type": "string"}, "precondition_digest": {"$ref": "#/$defs/digest"}, "authorization_required": {"type": "boolean"}}
+      }
+    },
+    "blockers": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "state": {"enum": ["RELOCATION_PLANNED", "BLOCKED"]},
+    "plan_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {"digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}
+}

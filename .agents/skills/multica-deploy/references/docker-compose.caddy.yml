@@ -1,0 +1,24 @@
+# Compose overlay for the upstream docker-compose.selfhost.yml file.
+# Set CADDY_BIND_IP to the explicitly authorized host interface before use.
+# Never replace it with 0.0.0.0 for a private deployment.
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    depends_on:
+      backend:
+        condition: service_started
+      frontend:
+        condition: service_started
+    ports:
+      - "${CADDY_BIND_IP:?Set CADDY_BIND_IP to an authorized interface}:80:80"
+      - "${CADDY_BIND_IP:?Set CADDY_BIND_IP to an authorized interface}:443:443"
+      - "${CADDY_BIND_IP:?Set CADDY_BIND_IP to an authorized interface}:443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

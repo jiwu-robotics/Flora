@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-migrate-server.server-migration-plan.v1",
+  "title": "ServerMigrationPlan.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "source", "target", "origin_strategy", "workspace_ref", "application_release", "identity_sets"],
+  "properties": {
+    "schema": {"const": "multica-migrate-server.server-migration-plan.v1"},
+    "source": {"$ref": "#/$defs/server"},
+    "target": {"$ref": "#/$defs/server"},
+    "origin_strategy": {"enum": ["preserve", "change"]},
+    "workspace_ref": {"type": "string", "minLength": 1},
+    "application_release": {"$ref": "#/$defs/release"},
+    "identity_sets": {"$ref": "#/$defs/identity_sets"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["server_kind", "server_ref"],
+      "properties": {
+        "server_kind": {"const": "self-hosted"},
+        "server_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "image_set_digest"],
+      "properties": {
+        "commit": {"pattern": "^[0-9a-f]{40}$"},
+        "image_set_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "identity_sets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workspace_digest", "project_set_digest", "orchestrator_resource_digest", "runtime_fleet_membership_digest"],
+      "properties": {
+        "workspace_digest": {"$ref": "#/$defs/digest"},
+        "project_set_digest": {"$ref": "#/$defs/digest"},
+        "orchestrator_resource_digest": {"$ref": "#/$defs/digest"},
+        "runtime_fleet_membership_digest": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

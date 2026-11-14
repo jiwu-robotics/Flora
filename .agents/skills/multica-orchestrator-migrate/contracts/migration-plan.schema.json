@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-migrate.plan.v3",
+  "title": "MigrationPlan.v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "input_digest", "preflight_snapshot_digest", "release_candidate_digest", "project_bundle_manifest_digest", "native_squad_dispatch_digest", "bundle_closure", "operations", "blockers", "plan_digest"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator-migrate.plan.v3"},
+    "input_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "preflight_snapshot_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "release_candidate_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "project_bundle_manifest_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "native_squad_dispatch_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "bundle_closure": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"pattern": "^sha256:[0-9a-f]{64}$"}},
+    "operations": {"type": "array", "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "plan_digest": {"pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

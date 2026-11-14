@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-dispatch.integration-check-evidence.v1",
+  "title": "IntegrationCheckEvidence.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "generator", "run_admission_digest", "source_revision", "target_revision", "merge_revision", "project_ref", "integration_attempt", "checks", "observed_at", "evidence_digest"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator-dispatch.integration-check-evidence.v1"},
+    "generator": {"const": "multica-orchestrator-dispatch.default-integration-evaluator.v1"},
+    "run_admission_digest": {"$ref": "#/$defs/digest"},
+    "source_revision": {"$ref": "#/$defs/revision"},
+    "target_revision": {"$ref": "#/$defs/revision"},
+    "merge_revision": {"$ref": "#/$defs/revision"},
+    "project_ref": {"type": "string", "minLength": 1},
+    "integration_attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository_ref", "target_ref", "attempt_ref", "control_store_revision"],
+      "properties": {
+        "repository_ref": {"type": "string", "minLength": 1},
+        "target_ref": {"type": "string", "minLength": 1},
+        "attempt_ref": {"type": "string", "minLength": 1},
+        "control_store_revision": {"type": "integer", "minimum": 1}
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["orchestration-contract", "work-type-isolation", "work-item-execution-isolation", "cross-work-item-scope-conflict", "resource-lease-integrity", "integration-target-freshness", "artifact-revision-integrity", "permission-boundary", "human-approval-evidence"],
+      "properties": {
+        "orchestration-contract": {"$ref": "#/$defs/check"},
+        "work-type-isolation": {"$ref": "#/$defs/check"},
+        "work-item-execution-isolation": {"$ref": "#/$defs/check"},
+        "cross-work-item-scope-conflict": {"$ref": "#/$defs/check"},
+        "resource-lease-integrity": {"$ref": "#/$defs/check"},
+        "integration-target-freshness": {"$ref": "#/$defs/check"},
+        "artifact-revision-integrity": {"$ref": "#/$defs/check"},
+        "permission-boundary": {"$ref": "#/$defs/check"},
+        "human-approval-evidence": {"$ref": "#/$defs/check"}
+      }
+    },
+    "observed_at": {"type": "string", "format": "date-time"},
+    "evidence_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "evidence_ref", "details"],
+      "properties": {
+        "state": {"const": "PASS"},
+        "evidence_ref": {"type": "string", "pattern": "^dispatch:[a-z-]+:sha256:[0-9a-f]{64}$"},
+        "details": {"type": "object"}
+      }
+    }
+  }
+}

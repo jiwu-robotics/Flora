@@ -1,0 +1,329 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-nail-down.project-binding-ref.v12",
+  "title": "ProjectBindingRef.v12",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "server_bundle_manifest_digest",
+    "server_orchestration_ref",
+    "deployment_key",
+    "relocation_intent_digest",
+    "workspace_key",
+    "project_key",
+    "workspace_ref",
+    "project_ref",
+    "repository_ref",
+    "repository_provider",
+    "repository_identity",
+    "orchestrator_profile",
+    "repository_policy",
+    "command_profiles",
+    "command_profiles_digest",
+    "runtime_target_policy_digest",
+    "native_squad_dispatch",
+    "dispatch_contract_digest",
+    "repository_configuration",
+    "desired_state",
+    "state",
+    "activation_state",
+    "blockers",
+    "produced_at"
+  ],
+  "properties": {
+    "schema": {
+      "const": "multica-orchestrator-nail-down.project-binding-ref.v12"
+    },
+    "server_bundle_manifest_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "server_orchestration_ref": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "deployment_key": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "relocation_intent_digest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "workspace_key": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "project_key": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "workspace_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "repository_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "repository_provider": {
+      "const": "github"
+    },
+    "repository_identity": {
+      "type": "string",
+      "pattern": "^github:[^/]+/[^/]+$"
+    },
+    "repository_resource_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "orchestrator_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "manifest_digest",
+        "contract_version"
+      ],
+      "properties": {
+        "id": {
+          "const": "multica-super-individual-orchestration"
+        },
+        "manifest_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "contract_version": {
+          "const": "10"
+        }
+      }
+    },
+    "repository_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "main_ref",
+        "develop_ref",
+        "execution_mode",
+        "work_item_id_source",
+        "runtime_branch_authority",
+        "integration_branch_authority",
+        "branch_policy_digest",
+        "runtime_capability_digest",
+        "project_subpath",
+        "repository_command_profile"
+      ],
+      "properties": {
+        "main_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "develop_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "execution_mode": {
+          "const": "worktree"
+        },
+        "work_item_id_source": {
+          "const": "multica-issue-key"
+        },
+        "runtime_branch_authority": {
+          "const": "multica"
+        },
+        "integration_branch_authority": {
+          "const": "repository-provider"
+        },
+        "branch_policy_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "runtime_capability_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "project_subpath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository_command_profile": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "command_profiles": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "test",
+          "lint",
+          "build"
+        ],
+        "properties": {
+          "test": {
+            "$ref": "#/$defs/commandPolicy"
+          },
+          "lint": {
+            "$ref": "#/$defs/commandPolicy"
+          },
+          "build": {
+            "$ref": "#/$defs/commandPolicy"
+          }
+        }
+      }
+    },
+    "command_profiles_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "runtime_target_policy_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "native_squad_dispatch": {
+      "$ref": "#/$defs/nativeSquadDispatch"
+    },
+    "repository_configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issue_tracker_digest",
+        "triage_mapping_digest",
+        "domain_mapping_digest",
+        "binding_manifest_digest"
+      ],
+      "properties": {
+        "issue_tracker_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "triage_mapping_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "domain_mapping_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "binding_manifest_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "desired_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reissue_spec_digest"
+      ],
+      "properties": {
+        "reissue_spec_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "state": {
+      "const": "PROJECT_BOUND"
+    },
+    "activation_state": {
+      "const": "ACTIVE"
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "maxItems": 0
+    },
+    "produced_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "dispatch_contract_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "$defs": {
+    "commandPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "na_policy_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "command"
+          ]
+        },
+        {
+          "required": [
+            "na_policy_ref"
+          ]
+        }
+      ]
+    },
+    "nativeSquadDispatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "leader_first",
+        "leader_routes_by_exact_member_mention",
+        "member_reply_retriggers_leader",
+        "issue_assignment_no_start_required",
+        "runtime_open_fence_required"
+      ],
+      "properties": {
+        "leader_first": {
+          "const": true
+        },
+        "leader_routes_by_exact_member_mention": {
+          "const": true
+        },
+        "member_reply_retriggers_leader": {
+          "const": true
+        },
+        "issue_assignment_no_start_required": {
+          "const": true
+        },
+        "runtime_open_fence_required": {
+          "const": true
+        }
+      }
+    }
+  }
+}

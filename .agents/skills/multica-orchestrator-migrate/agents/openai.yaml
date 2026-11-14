@@ -1,0 +1,4 @@
+interface:
+  display_name: "Multica Orchestrator Migrate"
+  short_description: "Activate verified Project bundles across Runtime hosts"
+  default_prompt: "Use $multica-orchestrator-migrate to migrate and activate the verified Project release candidate."

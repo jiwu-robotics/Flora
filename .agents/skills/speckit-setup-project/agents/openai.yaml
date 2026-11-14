@@ -1,0 +1,5 @@
+interface:
+  display_name: "Spec Kit Setup Project"
+  short_description: "Initialize and validate the supported Spec Kit baseline"
+policy:
+  allow_implicit_invocation: false

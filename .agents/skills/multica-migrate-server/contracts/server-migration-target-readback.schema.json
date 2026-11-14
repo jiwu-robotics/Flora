@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-migrate-server.server-migration-target-readback.v1",
+  "title": "ServerMigrationTargetReadback.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "migration_plan_digest", "target", "workspace_ref", "application_release", "identity_sets", "target_authoritative", "source_service_state", "runtime_state", "final_state", "observed_at"],
+  "properties": {
+    "schema": {"const": "multica-migrate-server.server-migration-target-readback.v1"},
+    "migration_plan_digest": {"$ref": "#/$defs/digest"},
+    "target": {"$ref": "#/$defs/server"},
+    "workspace_ref": {"type": "string", "minLength": 1},
+    "application_release": {"$ref": "#/$defs/release"},
+    "identity_sets": {"$ref": "#/$defs/identity_sets"},
+    "target_authoritative": {"const": true},
+    "source_service_state": {"const": "stopped"},
+    "runtime_state": {"const": "RUNTIMES_READY"},
+    "final_state": {"enum": ["RUNTIMES_READY", "OBSERVING"]},
+    "observed_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["server_kind", "server_ref"],
+      "properties": {
+        "server_kind": {"const": "self-hosted"},
+        "server_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "image_set_digest"],
+      "properties": {
+        "commit": {"pattern": "^[0-9a-f]{40}$"},
+        "image_set_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "identity_sets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workspace_digest", "project_set_digest", "orchestrator_resource_digest", "runtime_fleet_membership_digest"],
+      "properties": {
+        "workspace_digest": {"$ref": "#/$defs/digest"},
+        "project_set_digest": {"$ref": "#/$defs/digest"},
+        "orchestrator_resource_digest": {"$ref": "#/$defs/digest"},
+        "runtime_fleet_membership_digest": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

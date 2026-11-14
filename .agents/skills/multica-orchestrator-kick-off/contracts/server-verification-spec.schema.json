@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator.server-verification-spec.v3",
+  "title": "Server verification specification v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "server_ref", "server_kind", "deployment_key", "relocation_intent_digest", "workspace_ref", "package_manifest_digest", "runtime_fleet", "skills", "agents", "squads", "produced_at"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator.server-verification-spec.v3"},
+    "server_ref": {"type": "string", "minLength": 1},
+    "server_kind": {"enum": ["cloud", "self-hosted"]},
+    "deployment_key": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "relocation_intent_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+    "workspace_ref": {"type": "string", "minLength": 1},
+    "package_manifest_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "runtime_fleet": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["alias", "runtime_ref", "daemon_ref", "provider", "capability_revision"],
+        "properties": {
+          "alias": {"type": "string", "minLength": 1},
+          "runtime_ref": {"type": "string", "minLength": 1},
+          "daemon_ref": {"type": "string", "minLength": 1},
+          "provider": {"type": "string", "minLength": 1},
+          "capability_revision": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "skills": {"type": "object", "additionalProperties": {"pattern": "^sha256:[0-9a-f]{64}$"}},
+    "agents": {
+      "type": "object",
+      "minProperties": 16,
+      "maxProperties": 16,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["agent_ref", "runtime_alias", "runtime_ref", "model", "thinking_level", "max_concurrent_tasks", "permission_mode", "instructions_digest", "skill_names"],
+        "properties": {
+          "agent_ref": {"type": "string", "minLength": 1},
+          "runtime_alias": {"type": "string", "minLength": 1},
+          "runtime_ref": {"type": "string", "minLength": 1},
+          "model": {"type": "string", "minLength": 1},
+          "thinking_level": {"type": ["string", "null"]},
+          "max_concurrent_tasks": {"type": "integer", "minimum": 1},
+          "permission_mode": {"const": "private"},
+          "instructions_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+          "skill_names": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+        }
+      }
+    },
+    "squads": {
+      "type": "object",
+      "required": ["feature", "fix"],
+      "additionalProperties": false,
+      "properties": {
+        "feature": {"$ref": "#/$defs/squad"},
+        "fix": {"$ref": "#/$defs/squad"}
+      }
+    },
+    "produced_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "squad": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["squad_ref", "leader_ref", "instructions_digest", "member_refs", "member_roles"],
+      "properties": {
+        "squad_ref": {"type": "string", "minLength": 1},
+        "leader_ref": {"type": "string", "minLength": 1},
+        "instructions_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+        "member_refs": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "member_roles": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["agent_ref", "squad_role"],
+            "properties": {
+              "agent_ref": {"type": "string", "minLength": 1},
+              "squad_role": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    }
+  }
+}

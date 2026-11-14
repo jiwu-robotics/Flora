@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator-relocate.operation-receipt.v1",
+  "title": "RelocationOperationReceipt.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "plan_digest", "operation_id", "precondition_digest", "authorization_ref", "postcondition", "state", "applied_at", "receipt_digest"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator-relocate.operation-receipt.v1"},
+    "plan_digest": {"$ref": "#/$defs/digest"},
+    "operation_id": {"type": "string", "minLength": 1},
+    "precondition_digest": {"$ref": "#/$defs/digest"},
+    "authorization_ref": {"type": "string", "minLength": 1},
+    "postcondition": {"type": "object"},
+    "state": {"const": "VERIFIED"},
+    "applied_at": {"type": "string", "format": "date-time"},
+    "receipt_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {"digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}
+}

@@ -1,0 +1,42 @@
+# Copy to ../agent_config.toml (relative to this skill) or ~/.agents/agent_config.toml.
+# The user-level config is used if the project-level file is absent.
+
+[video-downloader]
+# auto | douyin | wx-channels | yt-dlp
+default_backend = "auto"
+
+# Download root, particularly for yt-dlp and WeChat media.
+default_output_dir = "~/Downloads/video-downloads"
+
+# Optional executable path; otherwise inspect the skill runtime and PATH.
+yt_dlp_path = ""
+
+# Relative path inside the author directory. The author is resolved from
+# uploader, channel, creator, uploader_id, channel_id, then unknown-author.
+# Absolute paths and '..' are not permitted.
+yt_dlp_output_template = "%(title)s [%(id)s].%(ext)s"
+
+# Optional embedded Douyin backend and its native config.yml paths.
+# Never store cookies here; keep them in the Douyin native configuration.
+# Paths expand ~ and environment variables; relative paths use this skill root.
+douyin_downloader_home = ""
+douyin_config_path = ""
+
+# Local wx_channels_download service for WeChat SPH share links.
+# A trailing /api is removed automatically.
+wx_channels_api_url = "http://127.0.0.1:2022"
+wx_channels_timeout_seconds = 30
+wx_channels_login_timeout_seconds = 300
+
+# Optional external executable and its native config.yaml for starting the API.
+# Keep authentication cookies only in that native config, never this template.
+wx_channels_binary_path = ""
+wx_channels_config_path = ""
+
+# Dedicated Tencent Yuanbao login browser profile; never use a personal
+# Chrome, Edge, or other everyday browser profile.
+wx_channels_browser_profile_dir = ""
+
+# Optional output locations; otherwise under default_output_dir.
+hot_board_output_dir = ""
+search_output_dir = ""

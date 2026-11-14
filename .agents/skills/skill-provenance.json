@@ -1,0 +1,12 @@
+{
+  "skills": {
+    "git-workflow": {
+      "local_tree_sha256": "bb98f81e0e2c2c6f0d84471fc3a3d77fcf5b531b6d6ac71df1913cb442ed719b",
+      "lock_computed_hash": "6f22b67ff0574f6f5a2c90a0ef31e73ebbf671bab5f113b8f0bc05693f1be529",
+      "remote_head": "dd6ee538aee0f548d4a6b520118f875431fd749e",
+      "skill_path": "skills/git-workflow/SKILL.md",
+      "source": "affaan-m/ECC"
+    }
+  },
+  "version": 1
+}

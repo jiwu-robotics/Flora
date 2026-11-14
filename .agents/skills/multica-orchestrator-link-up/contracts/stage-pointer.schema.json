@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator.stage-pointer.v1",
+  "title": "StagePointer.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "scope", "subject_key", "name", "stage", "manifest_digest", "parent_manifest_digest", "generation", "updated_at"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator.stage-pointer.v1"},
+    "scope": {"enum": ["workspaces", "projects"]},
+    "subject_key": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "name": {"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "stage": {"enum": ["workspace-foundation", "server-orchestration", "project-binding"]},
+    "manifest_digest": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "parent_manifest_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+    "generation": {"type": ["integer", "null"], "minimum": 1},
+    "updated_at": {"type": "string", "format": "date-time"}
+  }
+}

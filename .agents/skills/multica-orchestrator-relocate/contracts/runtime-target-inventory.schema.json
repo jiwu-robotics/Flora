@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-orchestrator.runtime-target-inventory.v1",
+  "title": "Operator-local Runtime target inventory v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "name", "targets"],
+  "properties": {
+    "schema": {"const": "multica-orchestrator.runtime-target-inventory.v1"},
+    "name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "targets": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ssh_config_host", "consumer_profile", "target_state_root", "repository_root_template"],
+        "properties": {
+          "ssh_config_host": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+          "consumer_profile": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+          "target_state_root": {"type": "string", "pattern": "^/"},
+          "repository_root_template": {"type": "string", "pattern": "^/"},
+          "account_ref": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

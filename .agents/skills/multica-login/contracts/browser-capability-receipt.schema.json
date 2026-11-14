@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multica-login.browser-capability-receipt.v1",
+  "title": "BrowserCapabilityReceipt.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "lock_digest", "agent_browser_version", "core_workflow_digest", "browser_executable", "smoke_probe", "cache_reused", "managed_browser_installed", "observed_at", "expires_at", "receipt_digest"],
+  "properties": {
+    "schema": {"const": "multica-login.browser-capability-receipt.v1"},
+    "lock_digest": {"$ref": "#/$defs/digest"},
+    "agent_browser_version": {"type": "string", "minLength": 1},
+    "core_workflow_digest": {"$ref": "#/$defs/digest"},
+    "browser_executable": {"type": "object", "additionalProperties": false, "required": ["source", "path", "device", "inode", "size", "mtime_ns"], "properties": {"source": {"enum": ["system", "managed"]}, "path": {"type": ["string", "null"]}, "device": {"type": ["integer", "null"]}, "inode": {"type": ["integer", "null"]}, "size": {"type": ["integer", "null"]}, "mtime_ns": {"type": ["integer", "null"]}}},
+    "smoke_probe": {"const": "PASSED"},
+    "cache_reused": {"type": "boolean"},
+    "managed_browser_installed": {"type": "boolean"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "receipt_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {"digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}
+}

@@ -36,6 +36,11 @@ commands. `make image` builds the Compose image and `make image-push` pushes
 it; pushing requires registry access. Pass Compose build options with, for
 example, `make image BUILD_OPTIONS='--no-cache'`.
 
+The build uses the host network by default so a host-local proxy such as
+`127.0.0.1:10808` is reachable from Docker build steps. Set
+`FLORA_BUILD_NETWORK=default` to use Docker's default build network instead.
+Proxy addresses must be reachable from the selected build network.
+
 `make test` runs the adapter's CPU-only unit tests. `make lint`, `make format`,
 `make format-check`, and `make check` use [Ruff](https://docs.astral.sh/ruff/).
 Install Ruff in a separate tools environment or make it available on `PATH`;

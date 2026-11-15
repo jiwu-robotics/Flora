@@ -4,6 +4,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.ubuntu24.04-2.11.0+cu128
+      network: ${FLORA_BUILD_NETWORK:-host}
     gpus: all
     environment:
       FLORA_MODEL_CACHE: /model_zoo/flora/models

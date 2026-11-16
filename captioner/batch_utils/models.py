@@ -7,7 +7,7 @@ import os
 import threading
 import time
 from datetime import datetime, timezone
-from .config import MODELS, VENDOR, MODEL_CACHE
+from .config import MODELS, MODEL_CACHE
 _LOCK = threading.Lock()
 _MANIFEST_LOCK = threading.Lock()
 _VERIFIED_MANIFESTS = {}
@@ -44,6 +44,36 @@ def snapshot(kind):
         raise ValueError('Set ' + spec['repo_env'] + ' to the released checkpoint repository.')
     patterns = ['adapter_config.json', 'adapter_model.safetensors', 'config.json', 'generation_config.json', 'model.safetensors.index.json', 'model-*.safetensors', 'processor_config.json', 'tokenizer.json', 'tokenizer_config.json', 'chat_template.jinja', 'README.md', 'MODEL_PROVENANCE.json', 'SOURCE_MANIFEST.sha256']
     return Path(snapshot_download(spec['repo'], revision=spec['revision'], token=os.environ.get('HF_TOKEN'), allow_patterns=patterns, local_dir=MODEL_CACHE / kind))
+
+def load_merged_tempseg(path, torch):
+    from transformers import AutoModelForImageTextToText
+    from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5PreTrainedModel
+    from production_gdn_fix import _keep_native_gdn_fp32
+    from verify_gdn import verify
+    path = Path(path).expanduser().resolve(strict=True)
+    if not path.is_dir() or not (path / 'MERGE_PROVENANCE.json').is_file():
+        raise ValueError('weights_path must be a merged Flora TempSeg checkpoint directory')
+    provenance = json.loads((path / 'MERGE_PROVENANCE.json').read_text())
+    if provenance.get('schema') != 'flora_tempseg_merged_checkpoint_v1' or not provenance.get('adapter_merged'):
+        raise ValueError('The selected directory is not a merged Flora TempSeg checkpoint')
+    if provenance.get('base_revision') != MODELS['tempseg_base']['revision'] or provenance.get('adapter_sha256') != MODELS['tempseg']['sha256']:
+        raise ValueError('The merged checkpoint does not match the pinned Flora TempSeg weights')
+    _keep_native_gdn_fp32(Qwen3_5PreTrainedModel)
+    model, info = AutoModelForImageTextToText.from_pretrained(path, local_files_only=True, dtype=torch.bfloat16, attn_implementation='sdpa', output_loading_info=True)
+    if any((info.get(k) for k in ['missing_keys', 'mismatched_keys', 'error_msgs', 'unexpected_keys'])):
+        raise RuntimeError('The merged TempSeg checkpoint did not load completely')
+    model.to('cuda:0').eval()
+    devices = verify_cuda_residency(model)
+    gdn = verify(model, path)
+    original_generate = model.generate
+
+    def generate_bf16(self, *args, **kwargs):
+        with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
+            return original_generate(*args, **kwargs)
+
+    import types
+    model.generate = types.MethodType(generate_bf16, model)
+    return model, {'merged': True, 'provenance': provenance, 'gdn': gdn, 'loading_info': info, 'parameter_devices': devices, 'parameter_dtypes': dict(Counter((str(p.dtype) for p in model.parameters())))}
 
 def processor(kind, path):
     from transformers import AutoProcessor
@@ -104,11 +134,15 @@ def preflight_adapter_download():
 
 class Session:
 
-    def __init__(self):
+    def __init__(self, tempseg_weights_path=None):
         self.model = self.proc = None
         self.audit = {}
+        self.tempseg_weights_path = tempseg_weights_path
+        self.kind = None
 
     def load(self, kind):
+        if self.kind == kind and self.model is not None and self.proc is not None:
+            return self.model, self.proc
         import torch
         previous_threads = torch.get_num_threads()
         torch.set_num_threads(4)
@@ -120,11 +154,16 @@ class Session:
         self.close()
         runtime_event('model_load_start', kind=kind, cpu_threads=torch.get_num_threads(), previous_cpu_threads=previous_threads)
         _keep_native_gdn_fp32(Qwen3_5PreTrainedModel)
-        path = snapshot(kind)
+        merged = Path(self.tempseg_weights_path).expanduser().resolve(strict=True) if kind == 'tempseg' and self.tempseg_weights_path else None
+        path = merged or snapshot(kind)
         runtime_event('model_assets_ready', kind=kind, elapsed_s=round(time.monotonic() - load_started, 3))
-        validate_manifest(path)
-        runtime_event('model_assets_verified', kind=kind, elapsed_s=round(time.monotonic() - load_started, 3))
-        if kind == 'tempseg':
+        if merged:
+            self.model, self.audit[kind] = load_merged_tempseg(path, torch)
+            runtime_event('merged_checkpoint_verified', kind=kind, directory=str(path), adapter_sha256=self.audit[kind]['provenance']['adapter_sha256'])
+        else:
+            validate_manifest(path)
+            runtime_event('model_assets_verified', kind=kind, elapsed_s=round(time.monotonic() - load_started, 3))
+        if kind == 'tempseg' and not merged:
             base_spec = MODELS['tempseg_base']
             from huggingface_hub import snapshot_download
             base = snapshot_download(base_spec['repo'], revision=base_spec['revision'], token=os.environ.get('HF_TOKEN'), allow_patterns=['*.safetensors', '*.json', '*.jinja'])
@@ -132,7 +171,7 @@ class Session:
             records = {}
             self.model = load({'base': base, 'export': str(path), 'adapter_sha256': MODELS[kind]['sha256']}, lambda name, value: records.__setitem__(name, value))
             self.audit[kind] = records
-        else:
+        elif kind != 'tempseg':
             index = json.loads((path / 'model.safetensors.index.json').read_text())
             extra = {k for k in index['weight_map'] if '_extra_state' in k}
             memory = {i: f'{max(1, int(torch.cuda.get_device_properties(i).total_memory / 1024 ** 3) - 12)}GiB' for i in range(torch.cuda.device_count())}
@@ -145,16 +184,22 @@ class Session:
         runtime_event('model_parameters_verified', kind=kind, elapsed_s=round(time.monotonic() - load_started, 3))
         self.proc = processor(kind, path)
         if kind == 'tempseg':
-            adapter = self.audit[kind]['ADAPTER_VALUE_VERIFICATION.json']
-            gdn = self.audit[kind]['GDN_VALUE_VERIFICATION.json']
-            verification = dict(adapter_tensors=adapter['tensors'], adapter_values_exact=adapter['all_saved_values_exact_before_and_after_placement'], adapter_fp32=adapter['holders_fp32_before_assignment'], gdn_values_exact=gdn['all_values_equal_saved_checkpoint'], gdn_fp32=gdn['all_runtime_fp32'])
+            if self.audit[kind].get('merged'):
+                gdn = self.audit[kind]['gdn']
+                verification = dict(merged_checkpoint=True, gdn_values_exact=gdn['all_values_equal_saved_checkpoint'], gdn_fp32=gdn['all_runtime_fp32'], parameter_dtypes=self.audit[kind]['parameter_dtypes'])
+            else:
+                adapter = self.audit[kind]['ADAPTER_VALUE_VERIFICATION.json']
+                gdn = self.audit[kind]['GDN_VALUE_VERIFICATION.json']
+                verification = dict(adapter_tensors=adapter['tensors'], adapter_values_exact=adapter['all_saved_values_exact_before_and_after_placement'], adapter_fp32=adapter['holders_fp32_before_assignment'], gdn_values_exact=gdn['all_values_equal_saved_checkpoint'], gdn_fp32=gdn['all_runtime_fp32'])
         else:
             gdn = self.audit[kind]['gdn']
             verification = dict(gdn_values_exact=gdn['all_values_equal_saved_checkpoint'], gdn_fp32=gdn['all_runtime_fp32'], parameter_dtypes=self.audit[kind]['parameter_dtypes'])
         runtime_event('model_ready', kind=kind, revision=MODELS[kind]['revision'], torch_version=torch.__version__, gpu=torch.cuda.get_device_name(0), allocated_gib=round(torch.cuda.memory_allocated() / 1024 ** 3, 3), **verification)
+        self.kind = kind
         return (self.model, self.proc)
 
     def close(self):
+        self.kind = None
         self.model = self.proc = None
         gc.collect()
         import torch

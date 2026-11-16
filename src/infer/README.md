@@ -74,3 +74,62 @@ tar --exclude=__pycache__ --exclude='*.pyc' -cf - \
 ```
 
 GPU inference still requires approval before downloading weights to a new disk.
+
+### Direct Parquet TempSeg input
+
+The TempSeg entry point can read embedded `observation.images.high_cam` JPEGs
+without exporting a video. Use `--image-key observation.images.front_cam` to
+select a different JPEG column; the default is `observation.images.high_cam`.
+The same option is available in `src.infer` for dagger datasets.
+Validate an episode first:
+
+```bash
+python captioner/tempseg_infer.py --dataset-path /path/to/dataset \
+  --episode-index 0 --validate-only
+```
+
+Then run with a local merged checkpoint, or omit `--weights-path` to use the
+existing pinned base-model and adapter loading path:
+
+```bash
+python captioner/tempseg_infer.py --dataset-path /path/to/dataset \
+  --episode-index 0 --weights-path /path/to/merged-qwen3.5-9b \
+  --include-flags --flag-merge-gap 30 --output-dir outputs/tempseg
+```
+
+Omit `--episode-index` to process all episodes in one process with a shared model.
+The dataset profile defaults to `yam`; video and JSONL defaults remain unchanged.
+The package-handling instruction is an optional example at
+`captioner/examples/package_phases.txt`; pass its contents through `--instruction`
+when that task applies. There is no hardcoded task instruction.
+
+The reader uses `meta/info.json` (`fps`, and when present `data_path` and
+`chunks_size`) plus `meta/episodes.jsonl`. For datasets without the episode
+manifest/path template, it discovers `data/chunk-*/episode_*.parquet`.
+Files must contain one episode with contiguous zero-based `frame_index`, strictly
+increasing `relative_timestamp_sec`, and valid JPEG bytes. The native limits
+remain 120 seconds, 7200 frames, at most 4096 pixels per side, and at least 4 FPS.
+The total encoded JPEG payload is limited to 256 MiB. Oversized episodes are
+rejected; this direct path does not silently split or resample them.
+
+Results retain `flora_tempseg_v1`, seconds, metadata, provenance and input hashes.
+Each segment also contains `start_frame` and exclusive `end_frame`. Optional
+`flags` exclude boundaries below frame 10 and at/above `frame_count - 10`, then
+merge successive gaps strictly smaller than `--flag-merge-gap` and round each
+group mean. A gap of zero disables merging. Frames are native sequence positions,
+not indices into the model's 4 FPS sample. Parquet outputs carry `input_type` and
+`dataset_source`; the existing video-only `caption_only.py` cannot consume them.
+Existing outputs require `--overwrite` to replace.
+
+The dataset adapter also exposes this path explicitly:
+
+```bash
+python -m src.infer --dataset /path/to/dataset --kind dagger --mode tempseg \
+  --direct-parquet --episode 0 --output outputs/direct-check
+```
+
+Add `--run` for inference after its automatic CPU validation. `--weights-path`,
+`--instruction`, `--include-flags`, and `--flag-merge-gap` are forwarded in TempSeg
+mode. The adapter starts a separate process per episode; use the direct
+`captioner/tempseg_infer.py` batch command above for model reuse. Other adapter
+modes keep their existing video preparation behavior.

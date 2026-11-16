@@ -2,7 +2,9 @@ from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 import hashlib
+import io
 import av
+from PIL import Image
 from .config import MAX_DURATION_S, MAX_DIMENSION, MAX_FRAME_COUNT
 
 class InputError(ValueError):
@@ -17,6 +19,7 @@ class Video:
     duration_us: int
     size: tuple
     cfr: bool
+    encoded_frames: tuple | None = None
 
     @property
     def duration_s(self):
@@ -73,6 +76,14 @@ def decode_selected(video, wanted, canonical=False):
         return result
     if min(wanted) < 0 or max(wanted) >= len(video.pts_us):
         raise InputError('A requested source frame is outside the video.')
+    if video.encoded_frames is not None:
+        for i in wanted:
+            try:
+                with Image.open(io.BytesIO(video.encoded_frames[i])) as frame:
+                    result[i] = frame.convert('RGB')
+            except (OSError, IndexError) as error:
+                raise InputError(f'Source image frame {i} could not be decoded.') from error
+        return result
     with av.open(str(video.path), options={'err_detect': 'explode'}) as container:
         stream = container.streams.video[0]
         stream.codec_context.thread_count = 1

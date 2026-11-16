@@ -12,6 +12,10 @@ from batch_utils.config import MODELS
 
 
 def checked_segments(payload, inspection):
+    if payload.get("input_type") == "parquet":
+        raise ValueError(
+            "Direct Parquet results require a Parquet-aware captioning input; this entry point accepts videos only."
+        )
     if payload.get("schema_version") != "flora_tempseg_v1":
         raise ValueError("Expected a Flora TempSeg result.")
     if payload.get("input_sha256") != {

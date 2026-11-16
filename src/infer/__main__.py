@@ -31,7 +31,7 @@ def source_path(root, template, episode, chunks_size, **extra):
     return path
 
 
-def dataset(root, kind, selected):
+def dataset(root, kind, selected, image_key=None):
     info = json.loads((root / "meta/info.json").read_text(encoding="utf-8"))
     fps, chunk = info["fps"], info["chunks_size"]
     if (
@@ -50,7 +50,7 @@ def dataset(root, kind, selected):
     if not episodes:
         raise ValueError("No matching episodes")
     key = (
-        "observation.images.high_cam"
+        (image_key or "observation.images.high_cam")
         if kind == "dagger"
         else "observation.images.ego_l"
     )
@@ -174,11 +174,40 @@ def run(args):
     segments_dir = getattr(args, "segments_dir", None)
     if args.run and mode == "captioner" and segments_dir is None:
         raise ValueError("--segments-dir is required for captioner mode")
+    direct = getattr(args, "direct_parquet", False)
+    if direct and (args.kind != "dagger" or mode != "tempseg"):
+        raise ValueError("--direct-parquet requires --kind dagger --mode tempseg")
+    if mode != "tempseg" and (
+        getattr(args, "weights_path", None)
+        or getattr(args, "include_flags", False)
+        or getattr(args, "instruction", "")
+    ):
+        raise ValueError(
+            "--weights-path, --include-flags and --instruction require --mode tempseg"
+        )
+    image_key = getattr(args, "image_key", None)
+    if image_key is not None and (args.kind != "dagger" or not image_key.strip()):
+        raise ValueError(
+            "--image-key requires --kind dagger and a nonempty column name"
+        )
     entries = []
     part_count = 0
-    for episode, path, fps, key in dataset(root, args.kind, args.episode):
+    for episode, path, fps, key in dataset(
+        root, args.kind, args.episode, image_key=image_key
+    ):
         remaining = args.max_parts - part_count if args.max_parts else 0
-        if args.kind == "dagger":
+        if direct:
+            parts = [
+                dict(
+                    id=f"episode_{episode['episode_index']:06d}",
+                    video=str(path),
+                    start_frame=0,
+                    frames=episode["length"],
+                    offset_s=0,
+                    input_type="parquet",
+                )
+            ]
+        elif args.kind == "dagger":
             parts = dagger_parts(path, episode, fps, key, media, remaining)
         else:
             parts = [
@@ -213,6 +242,26 @@ def run(args):
                 "--profile",
                 "yam" if args.kind == "dagger" else "human",
             ]
+            if direct:
+                command[2:4] = [
+                    "--dataset-path",
+                    str(root),
+                    "--episode-index",
+                    str(episode["episode_index"]),
+                    "--image-key",
+                    key,
+                ]
+            if mode == "tempseg":
+                if getattr(args, "weights_path", None):
+                    command += ["--weights-path", str(args.weights_path)]
+                if getattr(args, "include_flags", False):
+                    command += [
+                        "--include-flags",
+                        "--flag-merge-gap",
+                        str(args.flag_merge_gap),
+                    ]
+                if getattr(args, "instruction", ""):
+                    command += ["--instruction", args.instruction]
             checked = subprocess.run(
                 command + ["--validate-only"], text=True, capture_output=True
             )
@@ -273,6 +322,13 @@ def run(args):
                 for segment in result["segments"]:
                     segment["start_s"] += part["offset_s"]
                     segment["end_s"] += part["offset_s"]
+                    for frame_key in ("start_frame", "end_frame"):
+                        if frame_key in segment:
+                            segment[frame_key] += part["start_frame"]
+                if "flags" in result:
+                    result["flags"] = [
+                        flag + part["start_frame"] for flag in result["flags"]
+                    ]
                 result["episode_source"] = {
                     k: v for k, v in job.items() if k != "video"
                 }
@@ -347,7 +403,30 @@ def main():
         type=Path,
         help="TempSeg output directory required for captioner mode",
     )
+    p.add_argument(
+        "--direct-parquet",
+        action="store_true",
+        help="Read embedded JPEGs directly for dagger TempSeg; episodes must fit the native limits.",
+    )
+    p.add_argument(
+        "--weights-path", type=Path, help="Local merged checkpoint for TempSeg mode."
+    )
+    p.add_argument(
+        "--include-flags",
+        action="store_true",
+        help="Include frame boundaries in TempSeg output.",
+    )
+    p.add_argument("--flag-merge-gap", type=int, default=30)
+    p.add_argument(
+        "--instruction", default="", help="Optional task instruction for TempSeg mode."
+    )
+    p.add_argument(
+        "--image-key",
+        help="JPEG column for dagger datasets (default: observation.images.high_cam).",
+    )
     args = p.parse_args()
+    if args.flag_merge_gap < 0:
+        p.error("--flag-merge-gap must be nonnegative")
     if args.segments_dir and (not args.run or args.mode != "captioner"):
         p.error("--segments-dir requires --run --mode captioner")
     if args.run and args.mode == "captioner" and not args.segments_dir:

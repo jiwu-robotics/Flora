@@ -14,6 +14,15 @@ inputs:
     type: BOOL
     defaults: false
     description: Run GPU inference after input validation.
+  - id: model_mode
+    type: SELECT
+    values: [both, tempseg, captioner]
+    defaults: both
+    description: Select both models in sequence or one model.
+  - id: segments_execution_id
+    type: STRING
+    required: false
+    description: TempSeg execution ID required for captioner mode.
 tasks:
   - id: validate
     type: io.kestra.plugin.scripts.shell.Commands
@@ -25,8 +34,8 @@ tasks:
       pullPolicy: NEVER
       user: "0:0"
       volumes:
-        - /data/jiwu-dagger:/data/jiwu-dagger
-        - /data/jiwu-umi:/data/jiwu-umi
+        - /data/jiwu-dagger:/data/jiwu-dagger:ro
+        - /data/jiwu-umi:/data/jiwu-umi:ro
         - /var/lib/preprocess-results:/results
     env:
       DATASET_KIND: "{{ inputs.dataset }}"
@@ -41,7 +50,7 @@ tasks:
           *) exit 2 ;;
         esac
         cd /app
-        python -m src.infer --kind "$DATASET_KIND" --dataset "$dataset" --max-parts "$MAX_PARTS" --output "$dataset/flora_annotations/$EXECUTION_ID"
+        python -m src.infer --kind "$DATASET_KIND" --dataset "$dataset" --max-parts "$MAX_PARTS" --output "/results/flora-annotations/$DATASET_KIND/$EXECUTION_ID"
   - id: annotate
     type: io.kestra.plugin.scripts.shell.Commands
     runIf: "{{ inputs.inference == true }}"
@@ -56,15 +65,18 @@ tasks:
           count: "1"
           capabilities: [[gpu]]
       volumes:
-        - /data/jiwu-dagger:/data/jiwu-dagger
-        - /data/jiwu-umi:/data/jiwu-umi
+        - /data/jiwu-dagger:/data/jiwu-dagger:ro
+        - /data/jiwu-umi:/data/jiwu-umi:ro
         - /var/lib/preprocess-results:/results
+        - /model_zoo:/model_zoo
     env:
       DATASET_KIND: "{{ inputs.dataset }}"
       MAX_PARTS: "{{ inputs.max_parts }}"
       EXECUTION_ID: "{{ execution.id }}"
-      FLORA_MODEL_CACHE: /results/flora-model-cache/models
-      HF_HOME: /results/flora-model-cache/huggingface
+      MODEL_MODE: "{{ inputs.model_mode }}"
+      SEGMENTS_EXECUTION_ID: "{{ inputs.segments_execution_id | default('') }}"
+      FLORA_MODEL_CACHE: /model_zoo/flora/models
+      HF_HOME: /model_zoo/huggingface
     commands:
       - |
         set -eu
@@ -74,4 +86,11 @@ tasks:
           *) exit 2 ;;
         esac
         cd /app
-        python -m src.infer --kind "$DATASET_KIND" --dataset "$dataset" --max-parts "$MAX_PARTS" --output "$dataset/flora_annotations/$EXECUTION_ID" --run
+        set -- --kind "$DATASET_KIND" --dataset "$dataset" --max-parts "$MAX_PARTS" --output "/results/flora-annotations/$DATASET_KIND/$EXECUTION_ID" --run --mode "$MODEL_MODE"
+        if [ "$MODEL_MODE" = captioner ]; then
+          case "$SEGMENTS_EXECUTION_ID" in
+            ""|*[!a-zA-Z0-9_-]*) echo "A valid TempSeg execution ID is required" >&2; exit 2 ;;
+          esac
+          set -- "$@" --segments-dir "/results/flora-annotations/$DATASET_KIND/$SEGMENTS_EXECUTION_ID"
+        fi
+        python -m src.infer "$@"

@@ -13,7 +13,7 @@ The image contains the annotation pipeline; the example below runs only TempSeg 
 docker compose run --rm flora python docker/download_tempseg.py
 ```
 
-The adapter goes to `./model_zoo/flora/models` and the base model to `./model_zoo/huggingface`. Both are mounted into the container and excluded from the image and Git. The download validates the adapter manifest; interrupted downloads can be resumed by running the command again. Set `HF_TOKEN` in the environment if needed; do not place it in a command or repository. Downloading weights to a new disk requires prior approval under AGENTS.md. The full TempSeg → Captioner pipeline additionally downloads Captioner weights into the same mounted cache.
+The adapter goes to `/mnt/sdb/.datapilot-modelzoo/flora/models` and the base model to `/mnt/sdb/.datapilot-modelzoo/huggingface`. Set `FLORA_MODEL_ZOO` to override the host directory. Both are mounted into the container and excluded from the image and Git. The download validates the adapter manifest; interrupted downloads can be resumed by running the command again. Set `HF_TOKEN` in the environment if needed; do not place it in a command or repository. Downloading weights to a new disk requires prior approval under AGENTS.md. The full TempSeg → Captioner pipeline additionally downloads Captioner weights into the same mounted cache.
 
 Mount the input directory with `FLORA_DATA_DIR` and use `FLORA_OUTPUT_DIR` for a writable output directory. For the supplied example:
 

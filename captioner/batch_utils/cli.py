@@ -5,11 +5,14 @@ import re
 import sys
 from .api import DataEnginePipeline
 
-def parser():
+def parser(*, dataset_input=False):
     p = argparse.ArgumentParser(description='FLORA: TempSeg -> Captioner with native video preprocessing.')
     source = p.add_mutually_exclusive_group(required=True)
     source.add_argument('--video', type=Path, help='Main/egocentric local video.')
     source.add_argument('--input-jsonl', type=Path, help='One video job per line; paths relative to this JSONL.')
+    if dataset_input:
+        source.add_argument('--dataset-path', type=Path, help='Dataset containing embedded JPEG episodes.')
+        p.add_argument('--episode-index', type=int, help='Select one dataset episode.')
     p.add_argument('--profile', choices=['human', 'yam', 'dex', 'tianji'], default='human')
     p.add_argument('--left-wrist', type=Path)
     p.add_argument('--right-wrist', type=Path)

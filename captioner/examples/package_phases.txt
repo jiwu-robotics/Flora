@@ -1,0 +1,6 @@
+The robot repeatedly handles packages. Segment each cycle into these four consecutive phases, using the visible gripper motion to place boundaries:
+1. Pick up and orient: start when the gripper begins moving toward the package to pick it up. End when the package has been placed with its front shipping label facing upward and the gripper has released and moved away from it.
+2. Reset after pickup: start immediately after phase 1. End when the gripper has lifted and returned to its reset position.
+3. Push right: start when the gripper begins moving toward the package to push it to the right. End when the gripper stops pushing, releases contact, and moves away from the package.
+4. Reset after push: start immediately after phase 3. End when the gripper has lifted and returned to its reset position.
+Keep the four phases as separate intervals. Do not split a phase because of minor grip adjustments or brief pauses. Repeat this four-phase pattern for each package-handling cycle.

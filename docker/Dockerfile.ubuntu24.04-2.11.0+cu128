@@ -20,6 +20,7 @@ RUN sed -i \
         iproute2 iputils-ping less libffi-dev libgl1 libglib2.0-0 libgomp1 \
         libsm6 libssl-dev libxext6 libxrender1 locales ninja-build openssh-client \
         pkg-config python3 python3-dev python3-pip python3-venv rsync unzip vim wget zip \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # BASH_ENV makes nvm available to non-interactive shells as well as build steps.
@@ -52,12 +53,13 @@ ENV UV_DEFAULT_INDEX=${UV_DEFAULT_INDEX} \
     UV_CONCURRENT_DOWNLOADS=${UV_CONCURRENT_DOWNLOADS} \
     UV_HTTP_TIMEOUT=600 \
     VIRTUAL_ENV=/opt/inference-venv
-RUN uv venv --python /usr/bin/python3 --seed "${VIRTUAL_ENV}"
+RUN uv venv --python /usr/bin/python3 --seed "${VIRTUAL_ENV}" \
+    && uv cache clean
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 
 # Pin the complete validated dependency graph; PyTorch hosts its CUDA wheels
 # separately from the default Python package index.
-RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked <<'REQUIREMENTS'
+RUN <<'REQUIREMENTS'
 set -e
 export NO_PROXY="${NO_PROXY:+${NO_PROXY},}pypi.nvidia.com,pypi.nvidia.cn,developer.download.nvidia.com,download.pytorch.org,download-r2.pytorch.org"
 export no_proxy="${NO_PROXY}"
@@ -127,6 +129,7 @@ typing-extensions==4.16.0
 PINS
 uv pip install --python "${VIRTUAL_ENV}/bin/python" -r /tmp/inference-requirements.txt
 uv pip check --python "${VIRTUAL_ENV}/bin/python"
+uv cache clean
 rm /tmp/inference-requirements.txt
 REQUIREMENTS
 
@@ -143,17 +146,17 @@ RUN printf '%s\n' "${VIRTUAL_ENV}/lib/python3.12/site-packages/tensorrt_libs" \
 WORKDIR /app
 COPY captioner/batch_utils/requirements.txt captioner/batch_utils/requirements.txt
 COPY requirements/dev.txt requirements/dev.txt
-RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
-    uv pip install --python "${VIRTUAL_ENV}/bin/python" -r requirements/dev.txt \
-    && uv pip check --python "${VIRTUAL_ENV}/bin/python"
+RUN uv pip install --python "${VIRTUAL_ENV}/bin/python" -r requirements/dev.txt \
+    && uv pip check --python "${VIRTUAL_ENV}/bin/python" \
+    && uv cache clean
 
 COPY captioner/ captioner/
 COPY docker/download_tempseg.py docker/download_tempseg.py
 COPY LICENSE LICENSE
 COPY requirements/jiwu.txt requirements/jiwu.txt
-RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
-    uv pip install --python "${VIRTUAL_ENV}/bin/python" -r requirements/jiwu.txt \
-    && uv pip check --python "${VIRTUAL_ENV}/bin/python"
+RUN uv pip install --python "${VIRTUAL_ENV}/bin/python" -r requirements/jiwu.txt \
+    && uv pip check --python "${VIRTUAL_ENV}/bin/python" \
+    && uv cache clean
 COPY src/ src/
 ENV FLORA_MODEL_CACHE=/model_zoo/flora/models \
     HF_HOME=/model_zoo/huggingface \

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -169,6 +170,10 @@ def run(args):
         raise FileExistsError(manifest)
     media = output / "media"
     media.mkdir(exist_ok=True)
+    mode = getattr(args, "mode", "both")
+    segments_dir = getattr(args, "segments_dir", None)
+    if args.run and mode == "captioner" and segments_dir is None:
+        raise ValueError("--segments-dir is required for captioner mode")
     entries = []
     part_count = 0
     for episode, path, fps, key in dataset(root, args.kind, args.episode):
@@ -195,7 +200,14 @@ def run(args):
             }
             command = [
                 sys.executable,
-                str(ROOT / "captioner/infer.py"),
+                str(
+                    ROOT
+                    / (
+                        "captioner/tempseg_infer.py"
+                        if mode == "tempseg"
+                        else "captioner/infer.py"
+                    )
+                ),
                 "--video",
                 part["video"],
                 "--profile",
@@ -217,7 +229,46 @@ def run(args):
                 )
             if args.run:
                 result_path = output / (part["id"] + ".json")
-                subprocess.run(command + ["--output", str(result_path)], check=True)
+                if mode == "captioner":
+                    source = json.loads(
+                        (segments_dir / (part["id"] + ".json")).read_text(
+                            encoding="utf-8"
+                        )
+                    )
+                    prior = source.get("episode_source", {})
+                    for key in (
+                        "episode_index",
+                        "start_frame",
+                        "frames",
+                        "fps",
+                        "camera",
+                        "source",
+                    ):
+                        if prior.get(key) != job[key]:
+                            raise ValueError(
+                                f"Segment source mismatch for {part['id']}: {key}"
+                            )
+                    for segment in source["segments"]:
+                        segment["start_s"] -= part["offset_s"]
+                        segment["end_s"] -= part["offset_s"]
+                    with tempfile.TemporaryDirectory(prefix="flora-segments-") as tmp:
+                        segment_file = Path(tmp) / "segments.json"
+                        segment_file.write_text(json.dumps(source), encoding="utf-8")
+                        caption_command = [
+                            sys.executable,
+                            str(ROOT / "captioner/caption_only.py"),
+                            "--video",
+                            part["video"],
+                            "--profile",
+                            "yam" if args.kind == "dagger" else "human",
+                            "--segments",
+                            str(segment_file),
+                            "--output",
+                            str(result_path),
+                        ]
+                        subprocess.run(caption_command, check=True)
+                else:
+                    subprocess.run(command + ["--output", str(result_path)], check=True)
                 result = json.loads(result_path.read_text(encoding="utf-8"))
                 for segment in result["segments"]:
                     segment["start_s"] += part["offset_s"]
@@ -232,7 +283,7 @@ def run(args):
                 incomplete = [
                     s for s in result["segments"] if s.get("status") != "complete"
                 ]
-                if incomplete:
+                if mode != "tempseg" and incomplete:
                     raise ValueError(
                         f"{result_path}: {len(incomplete)} incomplete segments"
                     )
@@ -249,6 +300,7 @@ def run(args):
                 "kind": args.kind,
                 "validated": True,
                 "inference": args.run,
+                "mode": mode if args.run else "validate",
                 "parts": entries,
             },
             indent=2,
@@ -284,7 +336,22 @@ def main():
     p.add_argument(
         "--run", action="store_true", help="Run GPU inference after CPU validation"
     )
+    p.add_argument(
+        "--mode",
+        choices=("both", "tempseg", "captioner"),
+        default="both",
+        help="Models to run with --run",
+    )
+    p.add_argument(
+        "--segments-dir",
+        type=Path,
+        help="TempSeg output directory required for captioner mode",
+    )
     args = p.parse_args()
+    if args.segments_dir and (not args.run or args.mode != "captioner"):
+        p.error("--segments-dir requires --run --mode captioner")
+    if args.run and args.mode == "captioner" and not args.segments_dir:
+        p.error("--run --mode captioner requires --segments-dir")
     if args.max_parts < 0 or (args.episode is not None and args.episode < 0):
         p.error("episode and max-parts must be non-negative")
     try:

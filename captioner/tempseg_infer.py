@@ -47,7 +47,7 @@ def main(argv=None):
                 start, end = item['start_s'], item['end_s']
                 if not (math.isfinite(start) and math.isfinite(end) and 0 <= start < end <= videos['main'].duration_s + 0.001):
                     raise RuntimeError('The pipeline returned an invalid segment interval.')
-                rows.append(dict(start_s=start, end_s=end, segmentation_provenance=item['metadata'].get('segmentation_provenance', 'fine')))
+                rows.append(dict(start_s=start, end_s=end, metadata=item['metadata'], segmentation_provenance=item['metadata'].get('segmentation_provenance', 'fine')))
             runtime_event('segmentation_complete', windows=len(audit), segments=len(rows))
             result = dict(schema_version='flora_tempseg_v1', duration_s=videos['main'].duration_s,
                           segments=rows, elapsed_s=round(time.monotonic() - started, 2),

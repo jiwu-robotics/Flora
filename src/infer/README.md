@@ -40,14 +40,37 @@ The GPU run requires the hardware and cache described in the repository
 
 `kestra/jiwu_flora.yaml` targets the DataPilot Kestra Docker-in-Docker runner on
 this host. The runner needs the image imported into its own Docker daemon; its
-`/data/jiwu-dagger` and `/data/jiwu-umi` mounts must be writable in both the
-outer Docker-in-Docker service and its task container. The current local
-DataPilot runner mounts these paths read-only, so its configuration must be
-changed and the service recreated before this flow can write to the datasets.
-The `/var/lib/preprocess-results` mount is used for the model cache. The
+`/data/jiwu-dagger` and `/data/jiwu-umi` mounts may be read-only; outputs go to the writable results volume.
+The Docker-in-Docker runner binds `/mnt/sdb/.datapilot-modelzoo` to `/model_zoo` using `kestra/docker-compose.modelzoo.yml`; the GPU task uses this mount for model weights. Include this override with the DataPilot Compose files when recreating the runner. To roll back, recreate the runner without the override and remove the `/model_zoo` task volume and environment overrides from the flow. The
 workflow defaults to validating one UMI part on CPU;
 select `dagger`, set `max_parts` to `0` for all, or set `inference` to `true`
 for GPU inference after arranging an approved cache and suitable GPU. Outputs
-are stored under `<dataset>/flora_annotations/<execution-id>`. The GPU task's
-cache is in the results volume under `flora-model-cache`; it is empty
-unless populated separately, and running it can download model weights there.
+are stored under `/var/lib/preprocess-results/flora-annotations/<dataset>/<execution-id>`. The GPU task's
+cache is at `/model_zoo` in the container, backed by `/mnt/sdb/.datapilot-modelzoo` on the host.
+
+## Model selection
+
+With `--run`, `--mode both` (the default) runs TempSeg followed by Captioner;
+`--mode tempseg` runs segmentation only. To run just Captioner, supply
+`--mode captioner --segments-dir /path/to/tempseg/run`. The directory must
+contain the matching TempSeg results for every selected part. The adapter
+checks episode metadata, video hashes and profile before using those intervals;
+TempSeg times are converted back from episode-relative to part-relative time.
+Without `--run`, only input validation is performed.
+
+In Kestra, select `model_mode` and set `inference=true`. For `captioner`, set
+`segments_execution_id` to a previous successful TempSeg execution for the
+same dataset and parts. Results are stored on the results volume at
+`/var/lib/preprocess-results/flora-annotations/<dataset>/<execution-id>`.
+The flow uses `jiwu.robotics/robox-datapilot/flora:latest`. Build it in the runner's Docker
+daemon using the existing Dockerfile after changing the code:
+
+```sh
+tar --exclude=__pycache__ --exclude='*.pyc' -cf - \
+  docker/Dockerfile.ubuntu24.04-2.11.0+cu128 docker/download_tempseg.py \
+  captioner src requirements LICENSE | \
+  docker exec -i robox-datapilot-datapilot-preprocess-dind-1 \
+    sh -c 'DOCKER_HOST=tcp://localhost:2375 docker build -f docker/Dockerfile.ubuntu24.04-2.11.0+cu128 -t jiwu.robotics/robox-datapilot/flora:latest -'
+```
+
+GPU inference still requires approval before downloading weights to a new disk.

@@ -170,3 +170,126 @@ def inspect_episode(videos, profile):
             )
         },
     )
+
+
+def iter_episode_parts(
+    dataset_path, episode_index, path, expected_frames=None, *, image_key=CAMERA
+):
+    """Yield bounded, sequential native-frame chunks without writing video files.
+
+    Unlike load_episode, this streaming interface requires the Parquet rows to be
+    in frame order; reordering image payloads would require unbounded buffering.
+    """
+    import pyarrow.parquet as pq
+
+    info = json.loads((Path(dataset_path).resolve() / "meta/info.json").read_text())
+    fps = Fraction(str(info["fps"]))
+    if fps < 4:
+        raise InputError("Dataset frame rate must be at least 4 FPS")
+    parquet = pq.ParquetFile(path)
+    if expected_frames is not None and parquet.metadata.num_rows != expected_frames:
+        raise InputError("Parquet frame count differs from episode metadata")
+    columns = [image_key, "relative_timestamp_sec", "frame_index", "episode_index"]
+    if not set(columns) <= set(parquet.schema_arrow.names):
+        raise InputError(f"Parquet requires columns: {columns}")
+    max_frames = min(MAX_FRAME_COUNT, int(fps * 60))
+    max_bytes = 240 * 1024 * 1024
+    payloads, times = [], []
+    total = start = part = 0
+    first_timestamp = previous_timestamp = None
+    size = None
+
+    def finish():
+        if len(payloads) < 2:
+            raise InputError("A chunk contains fewer than two frames")
+        zero = times[0]
+        relative = tuple(t - zero for t in times)
+        duration = round(relative[-1] + 1_000_000 / fps)
+        if duration > MAX_DURATION_S * 1_000_000:
+            raise InputError("Chunk exceeds maximum duration")
+        digest = hashlib.sha256()
+        for payload in payloads:
+            digest.update(len(payload).to_bytes(8, "big"))
+            digest.update(payload)
+        video = Video(
+            Path(path),
+            digest.hexdigest(),
+            fps,
+            relative,
+            duration,
+            size,
+            all(abs(t - i * 1_000_000 / fps) <= 1 for i, t in enumerate(relative)),
+            tuple(payloads),
+        )
+        return {
+            "start_frame": start,
+            "frames": len(payloads),
+            "offset_s": float((zero - first_timestamp) / 1_000_000),
+            "part": part,
+        }, {"main": video}
+
+    for batch in parquet.iter_batches(batch_size=32, columns=columns):
+        for row in batch.to_pylist():
+            index = row["frame_index"]
+            if row["episode_index"] != episode_index or index != start + len(payloads):
+                raise InputError(
+                    "Episode frames must be in contiguous frame_index order"
+                )
+            if row["relative_timestamp_sec"] is None:
+                raise InputError("Missing frame timestamp")
+            timestamp = Fraction(str(row["relative_timestamp_sec"])) * 1_000_000
+            if previous_timestamp is not None and timestamp <= previous_timestamp:
+                raise InputError("Dataset frame timestamps must be strictly increasing")
+            if first_timestamp is None:
+                first_timestamp = timestamp
+            value = row[image_key]
+            payload = value.get("bytes") if isinstance(value, dict) else None
+            if not payload or not payload.startswith(b"\xff\xd8"):
+                raise InputError(f"Missing or non-JPEG frame in {image_key}")
+            if len(payload) > max_bytes:
+                raise InputError("A single JPEG exceeds the chunk byte limit")
+            if payloads and (
+                len(payloads) >= max_frames
+                or total + len(payload) > max_bytes
+                or timestamp - times[0] + 1_000_000 / fps > MAX_DURATION_S * 1_000_000
+            ):
+                carry_payload = carry_time = None
+                # Keep at least two frames in the final chunk when possible.
+                if index == parquet.metadata.num_rows - 1 and len(payloads) >= 3:
+                    carry_payload = payloads.pop()
+                    carry_time = times.pop()
+                    total -= len(carry_payload)
+                    if (
+                        len(carry_payload) + len(payload) > max_bytes
+                        or timestamp - carry_time + 1_000_000 / fps
+                        > MAX_DURATION_S * 1_000_000
+                    ):
+                        raise InputError("Final two frames exceed chunk limits")
+                yield finish()
+                start += len(payloads)
+                part += 1
+                payloads, times, total = [], [], 0
+                if carry_payload is not None:
+                    payloads.append(carry_payload)
+                    times.append(carry_time)
+                    total = len(carry_payload)
+            try:
+                with Image.open(io.BytesIO(payload)) as image:
+                    if min(image.size) <= 0 or max(image.size) > 4096:
+                        raise InputError(
+                            "Dataset image dimensions must be at most 4096 pixels per side"
+                        )
+                    if size is not None and size != image.size:
+                        raise InputError("Dataset image dimensions must be consistent")
+                    size = image.size
+                    image.load()
+            except OSError as error:
+                raise InputError(
+                    f"A JPEG in {image_key} could not be decoded"
+                ) from error
+            payloads.append(payload)
+            times.append(timestamp)
+            total += len(payload)
+            previous_timestamp = timestamp
+    if payloads:
+        yield finish()

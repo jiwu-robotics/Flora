@@ -42,6 +42,7 @@ tasks:
       DATASET_KIND: "{{ inputs.dataset }}"
       MAX_PARTS: "{{ inputs.max_parts }}"
       EXECUTION_ID: "{{ execution.id }}"
+      MODEL_MODE: "{{ inputs.model_mode }}"
     commands:
       - |
         set -eu
@@ -51,7 +52,11 @@ tasks:
           *) exit 2 ;;
         esac
         cd /app
-        python -m src.infer --kind "$DATASET_KIND" --dataset "$dataset" --max-parts "$MAX_PARTS" --output "$dataset/tempseg/$EXECUTION_ID"
+        set -- --kind "$DATASET_KIND" --dataset "$dataset" --max-parts "$MAX_PARTS" --output "$dataset/tempseg/$EXECUTION_ID"
+        if [ "$DATASET_KIND" = dagger ] && [ "$MODEL_MODE" = tempseg ]; then
+          set -- "$@" --mode tempseg --direct-parquet
+        fi
+        python -m src.infer "$@"
   - id: annotate
     type: io.kestra.plugin.scripts.shell.Commands
     runIf: "{{ inputs.inference == true }}"
@@ -87,6 +92,9 @@ tasks:
         esac
         cd /app
         set -- --kind "$DATASET_KIND" --dataset "$dataset" --max-parts "$MAX_PARTS" --output "$dataset/tempseg/$EXECUTION_ID" --run --mode "$MODEL_MODE"
+        if [ "$DATASET_KIND" = dagger ] && [ "$MODEL_MODE" = tempseg ]; then
+          set -- "$@" --direct-parquet
+        fi
         if [ "$MODEL_MODE" = captioner ]; then
           case "$SEGMENTS_EXECUTION_ID" in
             ""|*[!a-zA-Z0-9_-]*) echo "A valid TempSeg execution ID is required" >&2; exit 2 ;;

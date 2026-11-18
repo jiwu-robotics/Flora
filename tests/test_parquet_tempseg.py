@@ -74,6 +74,18 @@ class ParquetTests(unittest.TestCase):
         self.assertEqual(decode_selected(video, {1, 10})[1].size, (16, 16))
         self.assertFalse(list(self.root.rglob("*.avi")))
 
+    def test_streaming_parts_preserve_frame_offsets(self):
+        from batch_utils import dataset as reader
+
+        pq.write_table(pa.Table.from_pylist(self.rows), self.path)
+        with patch.object(reader, "MAX_FRAME_COUNT", 5):
+            parts = list(reader.iter_episode_parts(self.root, 0, self.path, 12))
+        self.assertEqual([p[0]["frames"] for p in parts], [5, 5, 2])
+        self.assertEqual([p[0]["start_frame"] for p in parts], [0, 5, 10])
+        self.assertEqual([p[0]["offset_s"] for p in parts], [0, 1.25, 2.5])
+        self.assertEqual(parts[1][1]["main"].pts_us[0], 0)
+        self.assertFalse(list(self.root.rglob("*.avi")))
+
     def test_custom_image_key_and_missing_column(self):
         import tempseg_infer
 
@@ -176,69 +188,71 @@ class ParquetTests(unittest.TestCase):
         self.assertIn("input_sha256", result)
         self.assertIn("flags", result)
 
-    def test_adapter_direct_dispatch_does_not_invoke_ffmpeg(self):
+    def test_adapter_direct_resume_reuses_model_and_results(self):
         from src.infer import __main__ as adapter
+        from batch_utils import models, pipeline, dataset as reader
 
+        pq.write_table(pa.Table.from_pylist(self.rows), self.path)
         args = SimpleNamespace(
             dataset=self.root,
-            output=self.root / "adapter-out",
+            output=self.root / "out",
             kind="dagger",
             episode=0,
-            max_parts=1,
+            max_parts=0,
             run=True,
             mode="tempseg",
             segments_dir=None,
             direct_parquet=True,
             weights_path=None,
-            include_flags=True,
+            include_flags=False,
             flag_merge_gap=30,
-            instruction="Move the package.",
+            instruction="",
+            resume=False,
         )
-        calls = []
-
-        def invoke(command, **kwargs):
-            calls.append(command)
-            self.assertIn("--dataset-path", command)
-            self.assertNotIn("--video", command)
-            self.assertEqual(
-                command[command.index("--image-key") + 1], "observation.images.high_cam"
+        session = SimpleNamespace(close=lambda: None)
+        episodes = [
+            (
+                {"episode_index": 0, "length": 12},
+                self.path,
+                4,
+                "observation.images.high_cam",
             )
-            if "--validate-only" in command:
-                return SimpleNamespace(
-                    returncode=0,
-                    stdout=json.dumps({"cameras": {"main": {"frames": 12}}}),
-                    stderr="",
-                )
-            Path(command[command.index("--output") + 1]).write_text(
-                json.dumps({"segments": [{"start_s": 0, "end_s": 1}]})
-            )
-            return SimpleNamespace(returncode=0)
-
+        ]
         with (
+            patch.object(adapter, "dataset", return_value=episodes),
+            patch.object(reader, "MAX_FRAME_COUNT", 5),
+            patch.object(models, "Session", return_value=session) as factory,
             patch.object(
-                adapter,
-                "dataset",
-                return_value=[
-                    (
-                        {"episode_index": 0, "length": 12},
-                        self.path,
-                        4,
-                        "observation.images.high_cam",
-                    )
-                ],
-            ),
-            patch.object(
-                adapter,
-                "dagger_parts",
-                side_effect=AssertionError("must not create video"),
-            ),
-            patch.object(adapter.subprocess, "run", side_effect=invoke),
+                pipeline,
+                "segment",
+                return_value=([dict(start_s=0, end_s=0.5, metadata={})], []),
+            ) as predict,
+            patch("torch.cuda.is_available", return_value=True),
+            patch("torch.cuda.reset_peak_memory_stats"),
+            patch("torch.cuda.max_memory_allocated", return_value=0),
+            patch("torch.cuda.max_memory_reserved", return_value=0),
             contextlib.redirect_stdout(io.StringIO()),
         ):
             adapter.run(args)
-        self.assertEqual(len(calls), 2)
-        manifest = json.loads((args.output / "manifest.json").read_text())
-        self.assertEqual(manifest["parts"][0]["input_type"], "parquet")
+            self.assertEqual(factory.call_count, 1)
+            self.assertEqual(predict.call_count, 3)
+            result = json.loads(
+                (args.output / "episode_000000_part_0001.json").read_text()
+            )
+            self.assertEqual(result["segments"][0]["start_s"], 1.25)
+            self.assertEqual(result["segments"][0]["start_frame"], 5)
+            args.resume = True
+            adapter.run(args)
+            self.assertEqual(predict.call_count, 3)
+            self.assertFalse(list(self.root.rglob("*.avi")))
+
+    def test_streaming_avoids_single_frame_tail(self):
+        from batch_utils import dataset as reader
+
+        pq.write_table(pa.Table.from_pylist(self.rows[:11]), self.path)
+        with patch.object(reader, "MAX_FRAME_COUNT", 5):
+            parts = list(reader.iter_episode_parts(self.root, 0, self.path, 11))
+        self.assertEqual([p[0]["frames"] for p in parts], [5, 4, 2])
 
     def test_session_reuses_loaded_model(self):
         from batch_utils.models import Session

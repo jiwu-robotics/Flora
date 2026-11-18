@@ -213,10 +213,14 @@ def generate(model, proc, inputs, budget):
     n = inputs['input_ids'].shape[1]
     if n + budget > 32768:
         raise InputErrorForModel('The selected video exceeds the native model context budget.')
+    prep_started = time.monotonic()
     input_tensors = {k: {'dtype': str(v.dtype), 'shape': list(v.shape), 'sha256': hashlib.sha256(v.detach().cpu().contiguous().view(torch.uint8).numpy().tobytes()).hexdigest()} for k, v in inputs.items() if torch.is_tensor(v)}
     input_tensor_digest = hashlib.sha256(json.dumps(input_tensors, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    fingerprint_s = time.monotonic() - prep_started
     device = next(model.parameters()).device
+    transfer_started = time.monotonic()
     args = {k: v.to(device) if torch.is_tensor(v) else v for k, v in inputs.items()}
+    runtime_event('input_preparation', fingerprint_s=round(fingerprint_s, 3), transfer_host_s=round(time.monotonic() - transfer_started, 3))
     eos = proc.tokenizer.eos_token_id
     started = time.monotonic()
     runtime_event('generation_start', input_tokens=n, output_limit=budget, input_tensor_digest=input_tensor_digest, input_tensors=input_tensors)

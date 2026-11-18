@@ -38,15 +38,38 @@ The GPU run requires the hardware and cache described in the repository
 
 ## Local Kestra
 
-`kestra/jiwu_flora.yaml` targets the DataPilot Kestra Docker-in-Docker runner on
-this host. The runner needs the image imported into its own Docker daemon; its
-`/data/jiwu-dagger` and `/data/jiwu-umi` mounts may be read-only; outputs go to the writable results volume.
-The Docker-in-Docker runner binds `/mnt/sdb/.datapilot-modelzoo` to `/model_zoo` using `kestra/docker-compose.modelzoo.yml`; the GPU task uses this mount for model weights. Include this override with the DataPilot Compose files when recreating the runner. To roll back, recreate the runner without the override and remove the `/model_zoo` task volume and environment overrides from the flow. The
-workflow defaults to validating one UMI part on CPU;
-select `dagger`, set `max_parts` to `0` for all, or set `inference` to `true`
-for GPU inference after arranging an approved cache and suitable GPU. Outputs
-are stored under `/var/lib/preprocess-results/flora-annotations/<dataset>/<execution-id>`. The GPU task's
-cache is at `/model_zoo` in the container, backed by `/mnt/sdb/.datapilot-modelzoo` on the host.
+`kestra/jiwu_flora.yaml` uses the standard
+[Kestra Docker Task Runner](https://kestra.io/docs/task-runners/types/docker-task-runner)
+with the host engine at `unix:///var/run/docker.sock`. Both tasks use the existing
+`jiwu.robotics/robox-datapilot/flora:latest` image, which contains `/app/src/infer`
+and the annotation programs. Commands run inside that image; no additional worker
+image or container-launch script is needed.
+
+The trusted Kestra worker needs access to the host socket and Docker runner
+`volume-enabled: true`. Task containers receive no Docker socket. The GPU task
+requires the host NVIDIA container runtime. With `pullPolicy: NEVER`, prepare the
+Flora image in that same host engine before running the flow.
+
+Every volume source is a path on the engine host. Adapt the example's source
+paths to the installation before deployment:
+
+| Host source | Task path | Access |
+| --- | --- | --- |
+| `/mnt/sdb/jiwu-dagger` | `/data/jiwu-dagger` | Dataset and results |
+| `/mnt/sdb/jiwu-umi` | `/data/jiwu-umi` | Dataset and results |
+| `/mnt/sdb/.datapilot-modelzoo` | `/model_zoo` | Prepared model cache, GPU task only |
+
+Create the intended host directories with suitable permissions beforehand. A path
+that exists only inside the Kestra container is not a host bind source. The flow
+binds the model cache directly; no Compose cache override is required. Existing
+results and model data remain in place; changing this example does not migrate or
+remove any installation's data.
+
+The workflow defaults to TempSeg GPU inference on all UMI parts. Set `inference`
+to `false` for CPU validation only, select `dagger`, or set `max_parts` to a
+positive value to limit the number of parts. Outputs are stored under
+`<dataset_root>/tempseg/<execution-id>/`, including `manifest.json`. GPU runs
+require a suitable GPU and an approved model cache.
 
 ## Model selection
 
@@ -60,18 +83,10 @@ Without `--run`, only input validation is performed.
 
 In Kestra, select `model_mode` and set `inference=true`. For `captioner`, set
 `segments_execution_id` to a previous successful TempSeg execution for the
-same dataset and parts. Results are stored on the results volume at
-`/var/lib/preprocess-results/flora-annotations/<dataset>/<execution-id>`.
-The flow uses `jiwu.robotics/robox-datapilot/flora:latest`. Build it in the runner's Docker
-daemon using the existing Dockerfile after changing the code:
-
-```sh
-tar --exclude=__pycache__ --exclude='*.pyc' -cf - \
-  docker/Dockerfile.ubuntu24.04-2.11.0+cu128 docker/download_tempseg.py \
-  captioner src requirements LICENSE | \
-  docker exec -i robox-datapilot-datapilot-preprocess-dind-1 \
-    sh -c 'DOCKER_HOST=tcp://localhost:2375 docker build -f docker/Dockerfile.ubuntu24.04-2.11.0+cu128 -t jiwu.robotics/robox-datapilot/flora:latest -'
-```
+same dataset and parts. Results are stored under `<dataset_root>/tempseg/<execution-id>/`.
+Build the existing Flora image with `docker compose build` on the engine host
+when changing its code. Use the repository's normal image distribution procedure
+for another host; no separate nested image store is involved.
 
 GPU inference still requires approval before downloading weights to a new disk.
 

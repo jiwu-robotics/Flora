@@ -1,9 +1,0 @@
-# Add this override to the DataPilot Compose files for Flora's model cache.
-services:
-  datapilot-preprocess-dind:
-    volumes:
-      - type: bind
-        source: /mnt/sdb/.datapilot-modelzoo
-        target: /model_zoo
-        bind:
-          create_host_path: false

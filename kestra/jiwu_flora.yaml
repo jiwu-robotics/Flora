@@ -1,3 +1,5 @@
+# Docker Task Runner uses the host engine and the existing Flora image.
+# Bind sources are host paths; see src/infer/README.md for prerequisites.
 id: jiwu_flora
 namespace: flora.jiwu
 description: Validate and optionally annotate Jiwu DAgger high_cam or UMI ego_l episodes.
@@ -8,16 +10,16 @@ inputs:
     defaults: umi
   - id: max_parts
     type: INT
-    defaults: 1
+    defaults: 0
     description: Maximum video parts, 0 processes the full dataset.
   - id: inference
     type: BOOL
-    defaults: false
-    description: Run GPU inference after input validation.
+    defaults: true
+    description: Run GPU inference after input validation; set false for CPU validation only.
   - id: model_mode
     type: SELECT
     values: [both, tempseg, captioner]
-    defaults: both
+    defaults: tempseg
     description: Select both models in sequence or one model.
   - id: segments_execution_id
     type: STRING
@@ -30,13 +32,12 @@ tasks:
     containerImage: jiwu.robotics/robox-datapilot/flora:latest
     taskRunner:
       type: io.kestra.plugin.scripts.runner.docker.Docker
-      host: tcp://datapilot-preprocess-dind:2375
+      host: unix:///var/run/docker.sock
       pullPolicy: NEVER
       user: "0:0"
       volumes:
-        - /data/jiwu-dagger:/data/jiwu-dagger:ro
-        - /data/jiwu-umi:/data/jiwu-umi:ro
-        - /var/lib/preprocess-results:/results
+        - /mnt/sdb/jiwu-dagger:/data/jiwu-dagger
+        - /mnt/sdb/jiwu-umi:/data/jiwu-umi
     env:
       DATASET_KIND: "{{ inputs.dataset }}"
       MAX_PARTS: "{{ inputs.max_parts }}"
@@ -50,14 +51,14 @@ tasks:
           *) exit 2 ;;
         esac
         cd /app
-        python -m src.infer --kind "$DATASET_KIND" --dataset "$dataset" --max-parts "$MAX_PARTS" --output "/results/flora-annotations/$DATASET_KIND/$EXECUTION_ID"
+        python -m src.infer --kind "$DATASET_KIND" --dataset "$dataset" --max-parts "$MAX_PARTS" --output "$dataset/tempseg/$EXECUTION_ID"
   - id: annotate
     type: io.kestra.plugin.scripts.shell.Commands
     runIf: "{{ inputs.inference == true }}"
     containerImage: jiwu.robotics/robox-datapilot/flora:latest
     taskRunner:
       type: io.kestra.plugin.scripts.runner.docker.Docker
-      host: tcp://datapilot-preprocess-dind:2375
+      host: unix:///var/run/docker.sock
       pullPolicy: NEVER
       user: "0:0"
       deviceRequests:
@@ -65,10 +66,9 @@ tasks:
           count: "1"
           capabilities: [[gpu]]
       volumes:
-        - /data/jiwu-dagger:/data/jiwu-dagger:ro
-        - /data/jiwu-umi:/data/jiwu-umi:ro
-        - /var/lib/preprocess-results:/results
-        - /model_zoo:/model_zoo
+        - /mnt/sdb/jiwu-dagger:/data/jiwu-dagger
+        - /mnt/sdb/jiwu-umi:/data/jiwu-umi
+        - /mnt/sdb/.datapilot-modelzoo:/model_zoo
     env:
       DATASET_KIND: "{{ inputs.dataset }}"
       MAX_PARTS: "{{ inputs.max_parts }}"
@@ -86,11 +86,46 @@ tasks:
           *) exit 2 ;;
         esac
         cd /app
-        set -- --kind "$DATASET_KIND" --dataset "$dataset" --max-parts "$MAX_PARTS" --output "/results/flora-annotations/$DATASET_KIND/$EXECUTION_ID" --run --mode "$MODEL_MODE"
+        set -- --kind "$DATASET_KIND" --dataset "$dataset" --max-parts "$MAX_PARTS" --output "$dataset/tempseg/$EXECUTION_ID" --run --mode "$MODEL_MODE"
         if [ "$MODEL_MODE" = captioner ]; then
           case "$SEGMENTS_EXECUTION_ID" in
             ""|*[!a-zA-Z0-9_-]*) echo "A valid TempSeg execution ID is required" >&2; exit 2 ;;
           esac
-          set -- "$@" --segments-dir "/results/flora-annotations/$DATASET_KIND/$SEGMENTS_EXECUTION_ID"
+          set -- "$@" --segments-dir "$dataset/tempseg/$SEGMENTS_EXECUTION_ID"
         fi
-        python -m src.infer "$@"
+        # Kestra maps stderr to ERROR, even for progress and library warnings.
+        # Forward only known non-error messages to stdout; retain all other stderr.
+        python - "$@" <<'PYLOG'
+        import re
+        import subprocess
+        import sys
+
+        warning_prefixes = (
+            "[transformers] The `use_fast` parameter is deprecated",
+            "[transformers] Kwargs passed to `processor.__call__`",
+            "[transformers] Qwen3VL video processing does not apply",
+            "[transformers] `causal_conv1d_fn` is falling back",
+            "[transformers] `chunk_gated_delta_rule` is falling back",
+            "[transformers] `causal_conv1d_update` is falling back",
+            "[transformers] `fused_recurrent_gated_delta_rule` is falling back",
+        )
+        progress = re.compile(r"^(?:Fetching \d+ files:|Loading weights:|\d+% (?:Finding actions|Loading the action segmenter|Stitching finished|Writing captions))")
+        warning_context = False
+        process = subprocess.Popen(
+            [sys.executable, "-m", "src.infer", *sys.argv[1:]],
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
+        assert process.stderr is not None
+        for line in process.stderr:
+            stripped = line.strip()
+            known_warning = stripped.startswith(warning_prefixes) or (
+                "peft/mapping_func.py:" in stripped and "UserWarning:" in stripped
+            )
+            continuation = warning_context and stripped == "warnings.warn("
+            target = sys.stdout if known_warning or continuation or progress.match(stripped) else sys.stderr
+            print(line, end="", file=target, flush=True)
+            warning_context = known_warning
+        sys.exit(process.wait())
+        PYLOG

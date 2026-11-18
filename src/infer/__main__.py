@@ -7,6 +7,9 @@ import subprocess
 import sys
 import tempfile
 import uuid
+from contextlib import closing
+
+from .prefetch import prefetch_parts
 
 ROOT = Path(__file__).resolve().parents[2]
 MAX_BYTES = 240 * 1024 * 1024
@@ -157,6 +160,85 @@ def dagger_parts(path, episode, fps, key, out, max_parts):
             process.wait()
 
 
+def prepare_video_parts(args, root, mode, media, image_key):
+    """Prepare and validate inputs in the background, preserving dataset order."""
+    produced = 0
+    for episode, path, fps, key in dataset(
+        root, args.kind, args.episode, image_key=image_key
+    ):
+        remaining = args.max_parts - produced if args.max_parts else 0
+        if args.kind == "dagger":
+            parts = dagger_parts(path, episode, fps, key, media, remaining)
+        else:
+            parts = iter(
+                [
+                    {
+                        "id": f"episode_{episode['episode_index']:06d}",
+                        "video": str(path),
+                        "start_frame": 0,
+                        "frames": episode["length"],
+                        "offset_s": 0,
+                    }
+                ]
+            )
+        try:
+            for part in parts:
+                job = {
+                    **part,
+                    "episode_index": episode["episode_index"],
+                    "fps": fps,
+                    "camera": key,
+                    "source": str(path),
+                }
+                command = [
+                    sys.executable,
+                    str(
+                        ROOT
+                        / (
+                            "captioner/tempseg_infer.py"
+                            if mode == "tempseg"
+                            else "captioner/infer.py"
+                        )
+                    ),
+                    "--video",
+                    part["video"],
+                    "--profile",
+                    "yam" if args.kind == "dagger" else "human",
+                ]
+                if mode == "tempseg":
+                    if getattr(args, "weights_path", None):
+                        command += ["--weights-path", str(args.weights_path)]
+                    if getattr(args, "include_flags", False):
+                        command += [
+                            "--include-flags",
+                            "--flag-merge-gap",
+                            str(args.flag_merge_gap),
+                        ]
+                    if getattr(args, "instruction", ""):
+                        command += ["--instruction", args.instruction]
+                checked = subprocess.run(
+                    command + ["--validate-only"], text=True, capture_output=True
+                )
+                print(checked.stdout, end="", flush=True)
+                if checked.returncode:
+                    raise RuntimeError(
+                        checked.stderr.strip() or f"Input validation failed for {path}"
+                    )
+                inspection = json.loads(checked.stdout)
+                if inspection["cameras"]["main"]["frames"] != part["frames"]:
+                    raise ValueError(
+                        f"{path}: decoded frame count differs from episode metadata"
+                    )
+                produced += 1
+                yield job, command
+                if args.max_parts and produced >= args.max_parts:
+                    return
+        finally:
+            close = getattr(parts, "close", None)
+            if close is not None:
+                close()
+
+
 def run(args):
     root = args.dataset.resolve(strict=True)
     output = (
@@ -166,7 +248,7 @@ def run(args):
     ).resolve()
     output.mkdir(parents=True, exist_ok=True)
     manifest = output / "manifest.json"
-    if manifest.exists():
+    if manifest.exists() and not getattr(args, "resume", False):
         raise FileExistsError(manifest)
     media = output / "media"
     media.mkdir(exist_ok=True)
@@ -190,92 +272,24 @@ def run(args):
         raise ValueError(
             "--image-key requires --kind dagger and a nonempty column name"
         )
+    if direct:
+        from .direct import run_direct
+
+        return run_direct(
+            args,
+            root,
+            output,
+            dataset(root, args.kind, args.episode, image_key=image_key),
+        )
     entries = []
-    part_count = 0
-    for episode, path, fps, key in dataset(
-        root, args.kind, args.episode, image_key=image_key
-    ):
-        remaining = args.max_parts - part_count if args.max_parts else 0
-        if direct:
-            parts = [
-                dict(
-                    id=f"episode_{episode['episode_index']:06d}",
-                    video=str(path),
-                    start_frame=0,
-                    frames=episode["length"],
-                    offset_s=0,
-                    input_type="parquet",
-                )
-            ]
-        elif args.kind == "dagger":
-            parts = dagger_parts(path, episode, fps, key, media, remaining)
-        else:
-            parts = [
-                {
-                    "id": f"episode_{episode['episode_index']:06d}",
-                    "video": str(path),
-                    "start_frame": 0,
-                    "frames": episode["length"],
-                    "offset_s": 0,
-                }
-            ]
-        for part in parts:
-            job = {
-                **part,
-                "episode_index": episode["episode_index"],
-                "fps": fps,
-                "camera": key,
-                "source": str(path),
-            }
-            command = [
-                sys.executable,
-                str(
-                    ROOT
-                    / (
-                        "captioner/tempseg_infer.py"
-                        if mode == "tempseg"
-                        else "captioner/infer.py"
-                    )
-                ),
-                "--video",
-                part["video"],
-                "--profile",
-                "yam" if args.kind == "dagger" else "human",
-            ]
-            if direct:
-                command[2:4] = [
-                    "--dataset-path",
-                    str(root),
-                    "--episode-index",
-                    str(episode["episode_index"]),
-                    "--image-key",
-                    key,
-                ]
-            if mode == "tempseg":
-                if getattr(args, "weights_path", None):
-                    command += ["--weights-path", str(args.weights_path)]
-                if getattr(args, "include_flags", False):
-                    command += [
-                        "--include-flags",
-                        "--flag-merge-gap",
-                        str(args.flag_merge_gap),
-                    ]
-                if getattr(args, "instruction", ""):
-                    command += ["--instruction", args.instruction]
-            checked = subprocess.run(
-                command + ["--validate-only"], text=True, capture_output=True
-            )
-            print(checked.stdout, end="", flush=True)
-            if checked.returncode:
-                raise RuntimeError(
-                    checked.stderr.strip() or f"Input validation failed for {path}"
-                )
-            inspection = json.loads(checked.stdout)
-            camera = inspection["cameras"]["main"]
-            if camera["frames"] != part["frames"]:
-                raise ValueError(
-                    f"{path}: decoded frame count differs from episode metadata"
-                )
+    with closing(
+        prefetch_parts(
+            prepare_video_parts(args, root, mode, media, image_key),
+            limit=args.max_parts,
+        )
+    ) as parts:
+        for part, command in parts:
+            job = part
             if args.run:
                 result_path = output / (part["id"] + ".json")
                 if mode == "captioner":
@@ -344,11 +358,7 @@ def run(args):
                         f"{result_path}: {len(incomplete)} incomplete segments"
                     )
             entries.append(job)
-            part_count += 1
-            if args.max_parts and part_count >= args.max_parts:
-                break
-        if args.max_parts and part_count >= args.max_parts:
-            break
+
     manifest.write_text(
         json.dumps(
             {
@@ -406,7 +416,7 @@ def main():
     p.add_argument(
         "--direct-parquet",
         action="store_true",
-        help="Read embedded JPEGs directly for dagger TempSeg; episodes must fit the native limits.",
+        help="Read embedded JPEGs in bounded parts for dagger TempSeg.",
     )
     p.add_argument(
         "--weights-path", type=Path, help="Local merged checkpoint for TempSeg mode."
@@ -424,7 +434,14 @@ def main():
         "--image-key",
         help="JPEG column for dagger datasets (default: observation.images.high_cam).",
     )
+    p.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume matching direct Parquet results in the same output directory.",
+    )
     args = p.parse_args()
+    if args.resume and (not args.direct_parquet or not args.run or args.output is None):
+        p.error("--resume requires --direct-parquet --run and --output")
     if args.flag_merge_gap < 0:
         p.error("--flag-merge-gap must be nonnegative")
     if args.segments_dir and (not args.run or args.mode != "captioner"):

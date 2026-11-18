@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import threading
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -130,6 +131,106 @@ class ModelModesTests(unittest.TestCase):
                     json.loads((root / "out" / "manifest.json").read_text())["mode"],
                     mode,
                 )
+
+    def test_prefetches_next_episode_during_inference_for_all_video_modes(self):
+        for kind in ("umi", "dagger"):
+            for mode in ("both", "tempseg", "captioner"):
+                with (
+                    self.subTest(kind=kind, mode=mode),
+                    tempfile.TemporaryDirectory() as tmp,
+                ):
+                    root = Path(tmp)
+                    paths = [root / f"episode_{i}.mp4" for i in range(2)]
+                    for path in paths:
+                        path.touch()
+                    episodes = [
+                        ({"episode_index": i, "length": 2}, path, 30, "cam")
+                        for i, path in enumerate(paths)
+                    ]
+                    prior = root / "prior"
+                    prior.mkdir()
+                    ids = [
+                        f"episode_{i:06d}"
+                        if kind == "umi"
+                        else f"episode_{i:06d}_part_0000"
+                        for i in range(2)
+                    ]
+                    for i in range(2):
+                        (prior / (ids[i] + ".json")).write_text(
+                            json.dumps(
+                                {
+                                    "segments": [{"start_s": 0, "end_s": 1}],
+                                    "episode_source": {
+                                        "episode_index": i,
+                                        "start_frame": 0,
+                                        "frames": 2,
+                                        "fps": 30,
+                                        "camera": "cam",
+                                        "source": str(paths[i]),
+                                    },
+                                }
+                            )
+                        )
+                    args = SimpleNamespace(
+                        dataset=root,
+                        output=root / "out",
+                        kind=kind,
+                        episode=None,
+                        max_parts=0,
+                        run=True,
+                        mode=mode,
+                        segments_dir=prior if mode == "captioner" else None,
+                    )
+                    second_ready = threading.Event()
+                    inference_threads = []
+
+                    def prepared(path, episode, fps, key, media, remaining):
+                        i = episode["episode_index"]
+                        yield {
+                            "id": ids[i],
+                            "video": str(path),
+                            "start_frame": 0,
+                            "frames": 2,
+                            "offset_s": 0,
+                        }
+
+                    def invoke(command, **kwargs):
+                        if "--validate-only" in command:
+                            if command[command.index("--video") + 1] == str(paths[1]):
+                                second_ready.set()
+                            return SimpleNamespace(
+                                returncode=0,
+                                stdout=json.dumps({"cameras": {"main": {"frames": 2}}}),
+                                stderr="",
+                            )
+                        inference_threads.append(threading.current_thread().name)
+                        if len(inference_threads) == 1:
+                            self.assertTrue(
+                                second_ready.wait(3),
+                                "next episode not validated during inference",
+                            )
+                        output = Path(command[command.index("--output") + 1])
+                        output.write_text(
+                            json.dumps(
+                                {
+                                    "segments": [
+                                        {"start_s": 0, "end_s": 1, "status": "complete"}
+                                    ]
+                                }
+                            )
+                        )
+                        return SimpleNamespace(returncode=0)
+
+                    with (
+                        patch.object(adapter, "dataset", return_value=episodes),
+                        patch.object(adapter, "dagger_parts", side_effect=prepared),
+                        patch.object(adapter.subprocess, "run", side_effect=invoke),
+                        contextlib.redirect_stdout(io.StringIO()),
+                    ):
+                        adapter.run(args)
+                    self.assertEqual(inference_threads, ["MainThread", "MainThread"])
+                    manifest = json.loads((args.output / "manifest.json").read_text())
+                    self.assertEqual([item["id"] for item in manifest["parts"]], ids)
 
 
 if __name__ == "__main__":

@@ -27,11 +27,15 @@ class Predictor:
             window = a.window_from_payload(payload, self.source)
             plan = a.temporal_frame_plan(window, list(self.videos['main'].pts_us))
             mosaic = 'Dex' if self.pool in ('dex', 'tianji') else 'YAM'
+            started = time.monotonic()
             images = frames_for(self.videos, set(plan['source_frame_indices']), mosaic=mosaic)
+            decode_s = time.monotonic() - started
+            started = time.monotonic()
             if self.pool == 'human':
                 images = human_transport(images)
             frames = [images[i] for i in plan['source_frame_indices']]
             inputs, prompt = temporal_inputs(frames, window, self.pool, self.proc, list(self.videos), self.instruction)
+            runtime_event('window_preparation', window=len(self.calls) + 1, decode_s=round(decode_s, 3), preprocessing_s=round(time.monotonic() - started, 3))
             self.progress(0.25, desc=f'Finding actions · window {len(self.calls) + 1}')
             text = generate(self.model, self.proc, inputs, 1024)
             predictions.append(dict(scope_id=window.scope_id, prediction_json=text))

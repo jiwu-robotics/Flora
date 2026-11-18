@@ -11,7 +11,10 @@ re-encoding, at the dataset's declared frame rate. Each part records its
 starting frame and episode-relative offset in `manifest.json`. Outputs from
 inference have their segment times adjusted to episode-relative seconds, and
 include `episode_source`. The adapter checks episode frame counts, missing
-frames and Flora input constraints. Incomplete segment statuses cause an
+frames and Flora input constraints. All dataset modes prepare and validate at
+most one upcoming part in the background while inference runs serially. Video
+modes still reload their models for each part; only direct Parquet TempSeg
+currently reuses one model session. Incomplete segment statuses cause an
 error. UMI videos are passed through unchanged; oversized or otherwise invalid
 videos are reported by Flora rather than silently modified.
 
@@ -65,7 +68,9 @@ binds the model cache directly; no Compose cache override is required. Existing
 results and model data remain in place; changing this example does not migrate or
 remove any installation's data.
 
-The workflow defaults to TempSeg GPU inference on all UMI parts. Set `inference`
+The workflow defaults to TempSeg GPU inference on all UMI parts. With `dagger`
+and `tempseg`, it reads Parquet directly in bounded parts without preparing AVI
+files, reuses one model session, and prefetches at most one part across episodes on a reader thread. Set `inference`
 to `false` for CPU validation only, select `dagger`, or set `max_parts` to a
 positive value to limit the number of parts. Outputs are stored under
 `<dataset_root>/tempseg/<execution-id>/`, including `manifest.json`. GPU runs
@@ -145,6 +150,9 @@ python -m src.infer --dataset /path/to/dataset --kind dagger --mode tempseg \
 
 Add `--run` for inference after its automatic CPU validation. `--weights-path`,
 `--instruction`, `--include-flags`, and `--flag-merge-gap` are forwarded in TempSeg
-mode. The adapter starts a separate process per episode; use the direct
-`captioner/tempseg_infer.py` batch command above for model reuse. Other adapter
-modes keep their existing video preparation behavior.
+mode. The adapter reads ordered Parquet rows into bounded parts (at most 60 s
+and 240 MiB of JPEG data), prefetches at most one part across episodes, and reuses one model session. Results are written per
+part with episode-relative frame and time offsets; the manifest is written after
+completion. Use `--resume --run --output <same-directory>` to reuse matching
+completed parts. Resume is not supported with custom merged weights. Other
+adapter modes keep their existing video preparation behavior.

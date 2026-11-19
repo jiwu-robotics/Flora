@@ -30,6 +30,8 @@ tasks:
     type: io.kestra.plugin.scripts.shell.Commands
     runIf: "{{ inputs.inference == false }}"
     containerImage: jiwu.robotics/robox-datapilot/flora:latest
+    outputFiles:
+      - "kestra-output/*.json"
     taskRunner:
       type: io.kestra.plugin.scripts.runner.docker.Docker
       host: unix:///var/run/docker.sock
@@ -46,6 +48,7 @@ tasks:
     commands:
       - |
         set -eu
+        kestra_output="$PWD/kestra-output"
         case "$DATASET_KIND" in
           dagger) dataset=/data/jiwu-dagger/Robot_data_liqian_20261030_174559 ;;
           umi) dataset=/data/jiwu-umi/Robot_data_Bing_20261111_144059 ;;
@@ -57,10 +60,14 @@ tasks:
           set -- "$@" --mode tempseg --direct-parquet
         fi
         python -m src.infer "$@"
+        mkdir -p "$kestra_output"
+        cp "$dataset/tempseg/$EXECUTION_ID/"*.json "$kestra_output/"
   - id: annotate
     type: io.kestra.plugin.scripts.shell.Commands
     runIf: "{{ inputs.inference == true }}"
     containerImage: jiwu.robotics/robox-datapilot/flora:latest
+    outputFiles:
+      - "kestra-output/*.json"
     taskRunner:
       type: io.kestra.plugin.scripts.runner.docker.Docker
       host: unix:///var/run/docker.sock
@@ -85,6 +92,7 @@ tasks:
     commands:
       - |
         set -eu
+        kestra_output="$PWD/kestra-output"
         case "$DATASET_KIND" in
           dagger) dataset=/data/jiwu-dagger/Robot_data_liqian_20261030_174559 ;;
           umi) dataset=/data/jiwu-umi/Robot_data_Bing_20261111_144059 ;;
@@ -137,3 +145,5 @@ tasks:
             warning_context = known_warning
         sys.exit(process.wait())
         PYLOG
+        mkdir -p "$kestra_output"
+        cp "$dataset/tempseg/$EXECUTION_ID/"*.json "$kestra_output/"

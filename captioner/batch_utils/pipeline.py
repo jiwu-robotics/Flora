@@ -1,7 +1,6 @@
 import asyncio
 from fractions import Fraction
 import hashlib
-import json
 from pathlib import Path
 import tempfile
 import time
@@ -142,7 +141,7 @@ def caption_three(videos, segments, session, instruction, progress, profile='YAM
             audit.append(dict(event_id=plan['target_id'], blocks=plan['blocks'], common_geometry=geometry['common_geometry'], camera_layout=group, prompt_sha256=hashlib.sha256(text.encode()).hexdigest()))
     return ([row for _, row in sorted(rows)], audit)
 
-def annotate(videos, profile, long_windows, instruction, progress):
+def segment_annotation(videos, profile, long_windows, instruction, progress, session):
     check_synchronized(videos)
     instruction_suffix(instruction)
     if profile not in PROFILE_POOLS:
@@ -154,20 +153,55 @@ def annotate(videos, profile, long_windows, instruction, progress):
     if long_windows and profile not in ('YAM', 'Robot actions'):
         raise InputError('The 32-second profile is available for YAM videos.')
     pool = 'yam32' if long_windows else PROFILE_POOLS[profile]
-    start = time.monotonic()
+    started = time.monotonic()
+    progress(0.1, desc='Loading the action segmenter')
+    segments, audit = segment(videos, pool, session, instruction, progress)
+    runtime_event('segmentation_complete', windows=len(audit), segments=len(segments))
+    return dict(
+        segments=segments,
+        temporal_windows=audit,
+        elapsed_s=time.monotonic() - started,
+        profile=profile,
+        input_sha256={role: video.sha256 for role, video in videos.items()},
+    )
+
+def caption_annotation(videos, profile, segmentation, instruction, progress, session):
+    started = time.monotonic()
+    input_sha256 = {role: video.sha256 for role, video in videos.items()}
+    if segmentation['input_sha256'] != input_sha256 or segmentation['profile'] != profile:
+        raise InputError('Segmentation source videos or profile changed before captioning.')
+    segments = segmentation['segments']
+    progress(0.5, desc='Writing action captions')
+    if len(videos) == 3:
+        captions, audit = caption_three(videos, segments, session, instruction, progress, profile=profile)
+    else:
+        captions, audit = caption_single(videos, segments, profile, session, instruction, progress)
+    for row, source in zip(captions, segments, strict=True):
+        row['segmentation_provenance'] = source['metadata'].get('segmentation_provenance', 'fine')
+    elapsed = segmentation['elapsed_s'] + (time.monotonic() - started)
+    runtime_event(
+        'annotation_complete',
+        segments=len(captions),
+        complete_captions=sum(r['status'] == 'complete' for r in captions),
+        elapsed_s=round(elapsed, 3),
+    )
+    return dict(
+        schema_version='flora_demo_annotation_v1',
+        duration_s=videos['main'].duration_s,
+        segments=captions,
+        elapsed_s=round(elapsed, 2),
+        source_clock='seconds relative to the first native source presentation timestamp',
+        camera_roles=list(videos),
+        profile=profile,
+        model_revisions=MODELS,
+        input_sha256=input_sha256,
+        pipeline=dict(temporal_windows=segmentation.get('temporal_windows', []), caption_inputs=audit),
+    )
+
+def annotate(videos, profile, long_windows, instruction, progress):
     session = Session()
     try:
-        progress(0.1, desc='Loading the action segmenter')
-        segments, temporal_audit = segment(videos, pool, session, instruction, progress)
-        runtime_event('segmentation_complete', windows=len(temporal_audit), segments=len(segments))
-        progress(0.5, desc='Stitching finished · loading the captioner')
-        if len(videos) == 3:
-            captions, caption_audit = caption_three(videos, segments, session, instruction, progress, profile=profile)
-        else:
-            captions, caption_audit = caption_single(videos, segments, profile, session, instruction, progress)
-        for row, segment_row in zip(captions, segments, strict=True):
-            row['segmentation_provenance'] = segment_row['metadata'].get('segmentation_provenance', 'fine')
-        runtime_event('annotation_complete', segments=len(captions), complete_captions=sum((r['status'] == 'complete' for r in captions)), elapsed_s=round(time.monotonic() - start, 3))
-        return dict(schema_version='flora_demo_annotation_v1', duration_s=videos['main'].duration_s, segments=captions, elapsed_s=round(time.monotonic() - start, 2), source_clock='seconds relative to the first native source presentation timestamp', camera_roles=list(videos), profile=profile, model_revisions=MODELS, input_sha256={role: video.sha256 for role, video in videos.items()}, pipeline=dict(temporal_windows=temporal_audit, caption_inputs=caption_audit))
+        segmentation = segment_annotation(videos, profile, long_windows, instruction, progress, session)
+        return caption_annotation(videos, profile, segmentation, instruction, progress, session)
     finally:
         session.close()

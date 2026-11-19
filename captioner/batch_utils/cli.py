@@ -1,9 +1,11 @@
 from pathlib import Path
+from contextlib import closing
 import argparse
 import json
 import re
 import sys
-from .api import DataEnginePipeline
+import tempfile
+from .api import DataEnginePipeline, _REQUEST_LOCK, checked_annotation
 
 def parser(*, dataset_input=False):
     p = argparse.ArgumentParser(description='FLORA: TempSeg -> Captioner with native video preprocessing.')
@@ -58,6 +60,47 @@ def jobs(args, p):
         raise ValueError('The JSONL contains no video jobs.')
     return items
 
+def progress(fraction, desc=''):
+    print(f'{fraction:.0%} {desc}', file=sys.stderr, flush=True)
+
+def write_result(output, result, *, overwrite=False):
+    payload = json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + '\n'
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open('w' if overwrite else 'x', encoding='utf-8') as f:
+        f.write(payload)
+    print(json.dumps({'output': str(output), 'segments': len(result['segments'])}), flush=True)
+
+def annotate_jobs(items, *, include_audit, overwrite):
+    import torch
+    if not torch.cuda.is_available():
+        raise RuntimeError('CUDA is required for inference. Use --validate-only to check inputs on CPU.')
+    from .models import Session
+    from .pipeline import segment_annotation, caption_annotation
+
+    with _REQUEST_LOCK, tempfile.TemporaryDirectory(prefix='flora-segments-') as temporary:
+        checkpoints = Path(temporary)
+        with closing(Session()) as session:
+            for index, (kwargs, _) in enumerate(items):
+                videos, profile = DataEnginePipeline._inputs(**kwargs)
+                segmentation = segment_annotation(
+                    videos, profile, kwargs.get('yam32', False),
+                    kwargs.get('instruction', ''), progress, session,
+                )
+                if not include_audit:
+                    segmentation.pop('temporal_windows')
+                (checkpoints / f'{index}.json').write_text(
+                    json.dumps(segmentation, allow_nan=False), encoding='utf-8',
+                )
+
+        with closing(Session()) as session:
+            for index, (kwargs, output) in enumerate(items):
+                segmentation = json.loads((checkpoints / f'{index}.json').read_text(encoding='utf-8'))
+                videos, profile = DataEnginePipeline._inputs(**kwargs)
+                result = caption_annotation(
+                    videos, profile, segmentation, kwargs.get('instruction', ''), progress, session,
+                )
+                write_result(output, checked_annotation(result, include_audit), overwrite=overwrite)
+
 def main(argv=None):
     p = parser()
     args = p.parse_args(argv)
@@ -67,17 +110,16 @@ def main(argv=None):
             for _, output in items:
                 if output.exists():
                     raise FileExistsError(f'Output already exists: {output}. Use --overwrite to replace it.')
+        if args.input_jsonl and not args.validate_only:
+            annotate_jobs(items, include_audit=args.include_audit, overwrite=args.overwrite)
+            return 0
         engine = DataEnginePipeline()
         for kwargs, output in items:
             if args.validate_only:
                 print(json.dumps(engine.inspect_inputs(**kwargs), allow_nan=False))
                 continue
-            result = engine.annotate(**kwargs, include_audit=args.include_audit, progress=lambda fraction, desc='': print(f'{fraction:.0%} {desc}', file=sys.stderr, flush=True))
-            payload = json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + '\n'
-            output.parent.mkdir(parents=True, exist_ok=True)
-            with output.open('w' if args.overwrite else 'x') as f:
-                f.write(payload)
-            print(json.dumps({'output': str(output), 'segments': len(result['segments'])}))
+            result = engine.annotate(**kwargs, include_audit=args.include_audit, progress=progress)
+            write_result(output, result, overwrite=args.overwrite)
         return 0
     except (OSError, ValueError, RuntimeError) as error:
         print(f'FLORA inference failed: {error}', file=sys.stderr)

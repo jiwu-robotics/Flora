@@ -5,10 +5,10 @@ import json
 from pathlib import Path
 import subprocess
 import sys
-import tempfile
 import uuid
 from contextlib import closing
 
+from .direct import atomic_json
 from .prefetch import prefetch_parts
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -162,6 +162,11 @@ def dagger_parts(path, episode, fps, key, out, max_parts):
 
 def prepare_video_parts(args, root, mode, media, image_key):
     """Prepare and validate inputs in the background, preserving dataset order."""
+    from batch_utils.api import DataEnginePipeline
+    from batch_utils.config import MODELS
+
+    profile = "yam" if args.kind == "dagger" else "human"
+    instruction = getattr(args, "instruction", "")
     produced = 0
     for episode, path, fps, key in dataset(
         root, args.kind, args.episode, image_key=image_key
@@ -190,53 +195,145 @@ def prepare_video_parts(args, root, mode, media, image_key):
                     "camera": key,
                     "source": str(path),
                 }
-                command = [
-                    sys.executable,
-                    str(
-                        ROOT
-                        / (
-                            "captioner/tempseg_infer.py"
-                            if mode == "tempseg"
-                            else "captioner/infer.py"
-                        )
-                    ),
-                    "--video",
-                    part["video"],
-                    "--profile",
-                    "yam" if args.kind == "dagger" else "human",
-                ]
-                if mode == "tempseg":
-                    if getattr(args, "weights_path", None):
-                        command += ["--weights-path", str(args.weights_path)]
-                    if getattr(args, "include_flags", False):
-                        command += [
-                            "--include-flags",
-                            "--flag-merge-gap",
-                            str(args.flag_merge_gap),
-                        ]
-                    if getattr(args, "instruction", ""):
-                        command += ["--instruction", args.instruction]
-                checked = subprocess.run(
-                    command + ["--validate-only"], text=True, capture_output=True
+                videos, canonical = DataEnginePipeline._inputs(
+                    part["video"], profile=profile, instruction=instruction
                 )
-                print(checked.stdout, end="", flush=True)
-                if checked.returncode:
-                    raise RuntimeError(
-                        checked.stderr.strip() or f"Input validation failed for {path}"
+                inspection = DataEnginePipeline._inspection(videos, canonical)
+                if mode == "tempseg":
+                    inspection.update(
+                        input_type="video",
+                        model_revisions={
+                            name: MODELS[name] for name in ("tempseg", "tempseg_base")
+                        },
                     )
-                inspection = json.loads(checked.stdout)
+                print(json.dumps(inspection, allow_nan=False), flush=True)
+                if args.kind == "umi" and inspection["duration_s"] > 90:
+                    raise ValueError(f"{path}: UMI episode exceeds 90 seconds")
                 if inspection["cameras"]["main"]["frames"] != part["frames"]:
                     raise ValueError(
                         f"{path}: decoded frame count differs from episode metadata"
                     )
                 produced += 1
-                yield job, command
+                yield job, videos, canonical, inspection
                 if args.max_parts and produced >= args.max_parts:
                     return
         finally:
             close = getattr(parts, "close", None)
             if close is not None:
                 close()
+
+
+def read_segments(directory, job):
+    source = json.loads((directory / (job["id"] + ".json")).read_text(encoding="utf-8"))
+    prior = source.get("episode_source", {})
+    for key in ("episode_index", "start_frame", "frames", "fps", "camera", "source"):
+        if prior.get(key) != job[key]:
+            raise ValueError(f"Segment source mismatch for {job['id']}: {key}")
+    if source.get("segment_coordinates") != "part":
+        for segment in source["segments"]:
+            segment["start_s"] -= job["offset_s"]
+            segment["end_s"] -= job["offset_s"]
+    return source
+
+
+def write_episode_result(output, job, result, *, captions):
+    from batch_utils.cli import write_result
+
+    for segment in result["segments"]:
+        segment["start_s"] += job["offset_s"]
+        segment["end_s"] += job["offset_s"]
+        for key in ("start_frame", "end_frame"):
+            if key in segment:
+                segment[key] += job["start_frame"]
+    if "flags" in result:
+        result["flags"] = [flag + job["start_frame"] for flag in result["flags"]]
+    result["episode_source"] = {
+        key: value for key, value in job.items() if key != "video"
+    }
+    path = output / (job["id"] + ".json")
+    write_result(path, result)
+    if captions:
+        incomplete = sum(s.get("status") != "complete" for s in result["segments"])
+        if incomplete:
+            raise ValueError(f"{path}: {incomplete} incomplete segments")
+
+
+def run_video_stages(args, mode, output, prepared):
+    import torch
+    from batch_utils.api import DataEnginePipeline, checked_annotation
+    from batch_utils.cli import progress
+    from batch_utils.models import Session
+    from batch_utils.pipeline import caption_annotation, segment_annotation
+    from caption_only import caption_result
+    from tempseg_infer import segment_result
+
+    if not torch.cuda.is_available():
+        raise RuntimeError("CUDA is required for inference.")
+    entries = []
+    instruction = getattr(args, "instruction", "")
+    if mode == "both":
+        checkpoints = output / "segments"
+        checkpoints.mkdir()
+    with closing(
+        Session(tempseg_weights_path=getattr(args, "weights_path", None))
+    ) as session:
+        for job, videos, profile, inspection in prepared:
+            path = output / (job["id"] + ".json")
+            if path.exists():
+                raise FileExistsError(path)
+            if mode == "captioner":
+                source = read_segments(args.segments_dir, job)
+                result = caption_result(
+                    videos, profile, source, inspection, session, progress
+                )
+                write_episode_result(output, job, result, captions=True)
+            else:
+                segmentation = segment_annotation(
+                    videos, profile, False, instruction, progress, session
+                )
+                result = segment_result(
+                    videos,
+                    profile,
+                    segmentation["segments"],
+                    segmentation["elapsed_s"],
+                    flag_merge_gap=(
+                        args.flag_merge_gap
+                        if getattr(args, "include_flags", False)
+                        else None
+                    ),
+                )
+                if mode == "both":
+                    result["segment_coordinates"] = "part"
+                    result["episode_source"] = {
+                        key: value for key, value in job.items() if key != "video"
+                    }
+                    atomic_json(checkpoints / path.name, result)
+                else:
+                    write_episode_result(output, job, result, captions=False)
+            entries.append(job)
+
+    if mode == "both":
+
+        def prepare_captions():
+            profile = "yam" if args.kind == "dagger" else "human"
+            for job in entries:
+                source = read_segments(checkpoints, job)
+                videos, canonical = DataEnginePipeline._inputs(
+                    job["video"], profile=profile
+                )
+                yield job, videos, canonical, source
+
+        with (
+            closing(prefetch_parts(prepare_captions())) as parts,
+            closing(Session()) as session,
+        ):
+            for job, videos, profile, source in parts:
+                result = caption_annotation(
+                    videos, profile, source, instruction, progress, session
+                )
+                checked_annotation(result, include_audit=False)
+                write_episode_result(output, job, result, captions=True)
+    return entries
 
 
 def run(args):
@@ -281,83 +378,20 @@ def run(args):
             output,
             dataset(root, args.kind, args.episode, image_key=image_key),
         )
-    entries = []
+    captioner = str(ROOT / "captioner")
+    if captioner not in sys.path:
+        sys.path.insert(0, captioner)
     with closing(
         prefetch_parts(
             prepare_video_parts(args, root, mode, media, image_key),
             limit=args.max_parts,
         )
     ) as parts:
-        for part, command in parts:
-            job = part
-            if args.run:
-                result_path = output / (part["id"] + ".json")
-                if mode == "captioner":
-                    source = json.loads(
-                        (segments_dir / (part["id"] + ".json")).read_text(
-                            encoding="utf-8"
-                        )
-                    )
-                    prior = source.get("episode_source", {})
-                    for key in (
-                        "episode_index",
-                        "start_frame",
-                        "frames",
-                        "fps",
-                        "camera",
-                        "source",
-                    ):
-                        if prior.get(key) != job[key]:
-                            raise ValueError(
-                                f"Segment source mismatch for {part['id']}: {key}"
-                            )
-                    for segment in source["segments"]:
-                        segment["start_s"] -= part["offset_s"]
-                        segment["end_s"] -= part["offset_s"]
-                    with tempfile.TemporaryDirectory(prefix="flora-segments-") as tmp:
-                        segment_file = Path(tmp) / "segments.json"
-                        segment_file.write_text(json.dumps(source), encoding="utf-8")
-                        caption_command = [
-                            sys.executable,
-                            str(ROOT / "captioner/caption_only.py"),
-                            "--video",
-                            part["video"],
-                            "--profile",
-                            "yam" if args.kind == "dagger" else "human",
-                            "--segments",
-                            str(segment_file),
-                            "--output",
-                            str(result_path),
-                        ]
-                        subprocess.run(caption_command, check=True)
-                else:
-                    subprocess.run(command + ["--output", str(result_path)], check=True)
-                result = json.loads(result_path.read_text(encoding="utf-8"))
-                for segment in result["segments"]:
-                    segment["start_s"] += part["offset_s"]
-                    segment["end_s"] += part["offset_s"]
-                    for frame_key in ("start_frame", "end_frame"):
-                        if frame_key in segment:
-                            segment[frame_key] += part["start_frame"]
-                if "flags" in result:
-                    result["flags"] = [
-                        flag + part["start_frame"] for flag in result["flags"]
-                    ]
-                result["episode_source"] = {
-                    k: v for k, v in job.items() if k != "video"
-                }
-                result_path.write_text(
-                    json.dumps(result, ensure_ascii=False, indent=2) + "\n",
-                    encoding="utf-8",
-                )
-                incomplete = [
-                    s for s in result["segments"] if s.get("status") != "complete"
-                ]
-                if mode != "tempseg" and incomplete:
-                    raise ValueError(
-                        f"{result_path}: {len(incomplete)} incomplete segments"
-                    )
-            entries.append(job)
+        entries = (
+            run_video_stages(args, mode, output, parts)
+            if args.run
+            else [job for job, *_ in parts]
+        )
 
     manifest.write_text(
         json.dumps(
@@ -452,7 +486,7 @@ def main():
         p.error("episode and max-parts must be non-negative")
     try:
         run(args)
-    except (ValueError, OSError, RuntimeError, subprocess.CalledProcessError) as exc:
+    except (ValueError, OSError, RuntimeError, KeyError, TypeError) as exc:
         print(f"Jiwu inference failed: {exc}", file=sys.stderr)
         return 1
     return 0

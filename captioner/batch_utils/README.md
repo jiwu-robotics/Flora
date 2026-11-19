@@ -54,7 +54,7 @@ YAM defaults to native 16-second temporal windows; use `--yam32` for the native
 all three; `--yam32` requires all three. Wrist files must share the main video's
 relative frame timestamps, frame count, and duration. Inputs are not resampled.
 
-The validated input limits are 120 seconds, 256 MiB per file, 4096 pixels per
+The input limits are 120 seconds, 708 MiB per video file, 4096 pixels per
 side, 7200 frames, and at least 4 source FPS. Variable-rate video is supported
 by the single-view Human path. `--instruction` optionally supplies an episode
 task; leave it blank for the default workflow.
@@ -78,9 +78,11 @@ Each row specifies one job. Camera paths are relative to the JSONL file:
 python infer.py --input-jsonl jobs.jsonl --output-dir results
 ```
 
-Jobs and predicted segments run sequentially; JSONL is not GPU batch scheduling.
-Existing outputs are preserved unless `--overwrite` is explicit. An error stops
-the command; successfully written earlier jobs remain available.
+The JSONL command runs TempSeg across every job, releases the model, then runs
+Captioner across every job. Each stage reuses one model session and processes
+its inputs sequentially. Temporary segmentation results are deleted when the
+command exits. Existing outputs are preserved unless `--overwrite` is explicit.
+An error stops the command. Captioned results already written remain available.
 
 ## Python usage
 

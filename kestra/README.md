@@ -40,7 +40,9 @@
         └── episode_*.parquet
 ```
 
-UMI 使用原始 `ego_l` 视频和 `human` profile；DAgger 从 Parquet 的 `observation.images.high_cam` 读取 JPEG 帧并使用 `yam` profile，不提供腕部视角。 两种数据集的所有模型模式均在后台最多预取并验证一个下一片段；GPU 推理保持串行。直接 Parquet TempSeg 复用模型会话；视频模式仍逐片段启动模型进程。适配器依据元数据寻找 episode。DAgger 默认的 `tempseg` 模式直接读取 Parquet，不生成 AVI；按原始帧分成最多 60 秒且 JPEG 数据不超过 240 MiB 的片段，逐片段验证并复用模型会话；后台跨 episode 最多预取一个片段，与当前 GPU 推理重叠。DAgger 的 `both` 和 `captioner` 模式仍会准备不超过 60 秒的 MJPEG AVI 片段；UMI 视频原样传入。输入约束和更详细的适配行为见 [`src/infer/README.md`](../src/infer/README.md)。
+UMI 使用原始 `ego_l` 视频和 `human` profile，每个 episode 最长 90 秒，视频文件最大 708 MiB。DAgger 从 Parquet 的 `observation.images.high_cam` 读取 JPEG 帧并使用 `yam` profile。DAgger 的 `tempseg` 模式直接读取 Parquet，`both` 和 `captioner` 模式使用 MJPEG AVI。DAgger 片段最长 60 秒，JPEG 数据最多 240 MiB。
+
+两种数据集都在后台预取并校验下一个片段，GPU 串行执行，每个阶段复用一个模型会话。`both` 先完成所有片段的 TempSeg，再释放 TempSeg 并加载 Captioner。输入约束见 [Jiwu 数据集适配器指南](../src/infer/README.md)。
 
 ## 执行与输出接口
 
@@ -52,7 +54,8 @@ UMI 使用原始 `ego_l` 视频和 `human` profile；DAgger 从 Parquet 的 `obs
     └── <execution-id>/
         ├── manifest.json
         ├── <part-id>.json       # 推理时每个片段一个结果
-        └── media/               # DAgger 的 both / captioner 模式准备的 AVI；默认 TempSeg 不生成 AVI
+        ├── media/               # DAgger 的 both / captioner 模式准备的 AVI
+        └── segments/            # both 模式的中间分段结果，使用片段相对坐标
 ```
 
 - `manifest.json` 记录容器内的 `dataset` 路径、`kind`、`validated`、`inference`、`mode` 和 `parts`。每个 part 包含 ID、视频或源文件路径、帧数、帧率、起始帧、时间偏移、episode 编号和相机信息。路径是容器内路径，宿主机访问时按上表映射。

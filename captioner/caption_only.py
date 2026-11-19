@@ -4,7 +4,7 @@ import argparse
 import json
 import math
 import sys
-import time
+from contextlib import closing
 from pathlib import Path
 
 from batch_utils.api import DataEnginePipeline
@@ -60,6 +60,24 @@ def checked_segments(payload, inspection):
     return segments
 
 
+def caption_result(videos, profile, payload, inspection, session, progress):
+    from batch_utils.pipeline import caption_annotation
+
+    segmentation = dict(
+        segments=checked_segments(payload, inspection),
+        profile=profile,
+        input_sha256=payload["input_sha256"],
+        elapsed_s=0,
+    )
+    result = caption_annotation(videos, profile, segmentation, "", progress, session)
+    result.pop("pipeline")
+    result["model_revisions"] = {
+        "captioner": MODELS["captioner"],
+        "segmentation_source": payload["model_revisions"],
+    }
+    return result
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--video", type=Path, required=True)
@@ -72,63 +90,35 @@ def main(argv=None):
     try:
         if args.output.exists():
             raise FileExistsError(args.output)
-        engine = DataEnginePipeline()
-        inspection = engine.inspect_inputs(args.video, profile=args.profile)
+        videos, profile = DataEnginePipeline._inputs(args.video, profile=args.profile)
+        inspection = DataEnginePipeline._inspection(videos, profile)
         payload = json.loads(args.segments.read_text(encoding="utf-8"))
-        segments = checked_segments(payload, inspection)
         import torch
 
         if not torch.cuda.is_available():
             raise RuntimeError("CUDA is required for inference.")
-        from batch_utils.models import Session, runtime_event
-        from batch_utils.pipeline import caption_single
+        from batch_utils.models import Session
 
-        videos, profile = engine._inputs(
-            args.video, args.profile, None, None, False, ""
-        )
-        session = Session()
-        started = time.monotonic()
-        try:
-            captions, _ = caption_single(
+        with closing(Session()) as session:
+            result = caption_result(
                 videos,
-                segments,
                 profile,
+                payload,
+                inspection,
                 session,
-                "",
                 lambda fraction, desc="": print(
                     f"{fraction:.0%} {desc}", file=sys.stderr, flush=True
                 ),
             )
-        finally:
-            session.close()
-        for row, source in zip(captions, segments, strict=True):
-            row["segmentation_provenance"] = source["metadata"][
-                "segmentation_provenance"
-            ]
-        result = dict(
-            schema_version="flora_demo_annotation_v1",
-            duration_s=videos["main"].duration_s,
-            segments=captions,
-            elapsed_s=round(time.monotonic() - started, 2),
-            source_clock="seconds relative to the first native source presentation timestamp",
-            camera_roles=list(videos),
-            profile=profile,
-            model_revisions={
-                "captioner": MODELS["captioner"],
-                "segmentation_source": payload["model_revisions"],
-            },
-            input_sha256={role: video.sha256 for role, video in videos.items()},
-        )
         args.output.parent.mkdir(parents=True, exist_ok=True)
         with args.output.open("x", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, indent=2, allow_nan=False)
             f.write("\n")
-        runtime_event(
-            "annotation_complete",
-            segments=len(captions),
-            complete_captions=sum(row["status"] == "complete" for row in captions),
+        print(
+            json.dumps(
+                {"output": str(args.output), "segments": len(result["segments"])}
+            )
         )
-        print(json.dumps({"output": str(args.output), "segments": len(captions)}))
         return 0
     except (OSError, ValueError, RuntimeError, KeyError, TypeError) as exc:
         print(f"FLORA inference failed: {exc}", file=sys.stderr)

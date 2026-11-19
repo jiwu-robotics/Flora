@@ -98,7 +98,7 @@ python captioner/infer.py --video main.mp4 --left-wrist left_wrist.mp4 --right-w
 
 - **Profiles:** `human` for egocentric human video (one camera), `yam` for parallel grippers, `dex` for
   dexterous hands (`tianji` is a variant for Tianji robots). Robot profiles take one camera or all three.
-- **Limits:** at most 120 s, 256 MiB and 4096 px per side per video, at 4 FPS or more. Split longer episodes.
+- **Limits:** at most 120 s, 708 MiB and 4096 px per side per video, at 4 FPS or more. Split longer episodes.
   Wrist videos must share the main video's frame timestamps.
 - **Many videos:** `python captioner/infer.py --input-jsonl jobs.jsonl --output-dir annotations/`
   ([job format](captioner/batch_utils/README.md#jsonl-jobs)).

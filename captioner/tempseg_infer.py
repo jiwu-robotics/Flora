@@ -11,6 +11,54 @@ from batch_utils.cli import jobs, parser
 from batch_utils.config import MODELS, PROFILE_POOLS
 
 
+def segment_result(
+    videos, profile, segments, elapsed_s, *, dataset_source=None, flag_merge_gap=None
+):
+    from batch_utils.segment_output import boundary_flags, frame_span
+
+    main = videos["main"]
+    rows = []
+    for item in segments:
+        start, end = item["start_s"], item["end_s"]
+        if not (
+            math.isfinite(start)
+            and math.isfinite(end)
+            and 0 <= start < end <= main.duration_s + 0.001
+        ):
+            raise RuntimeError("The pipeline returned an invalid segment interval.")
+        first, last = frame_span(main, start, end)
+        rows.append(
+            dict(
+                start_s=start,
+                end_s=end,
+                start_frame=first,
+                end_frame=last,
+                metadata=item["metadata"],
+                segmentation_provenance=item["metadata"].get(
+                    "segmentation_provenance", "fine"
+                ),
+            )
+        )
+    result = dict(
+        schema_version="flora_tempseg_v1",
+        duration_s=main.duration_s,
+        segments=rows,
+        elapsed_s=round(elapsed_s, 2),
+        source_clock="seconds relative to the first native source presentation timestamp",
+        profile=profile,
+        camera_roles=list(videos),
+        model_revisions={key: MODELS[key] for key in ("tempseg", "tempseg_base")},
+        input_sha256={role: video.sha256 for role, video in videos.items()},
+        input_type="parquet" if dataset_source is not None else "video",
+        frame_clock="zero-based native frame position; end_frame is exclusive",
+    )
+    if dataset_source is not None:
+        result["dataset_source"] = dataset_source
+    if flag_merge_gap is not None:
+        result["flags"] = boundary_flags(rows, len(main.pts_us), flag_merge_gap)
+    return result
+
+
 def main(argv=None):
     p = parser(dataset_input=True)
     p.add_argument(
@@ -151,71 +199,31 @@ def main(argv=None):
                     f"{fraction:.0%} {desc}", file=sys.stderr, flush=True
                 ),
             )
-            rows = []
-            for item in segments:
-                start, end = item["start_s"], item["end_s"]
-                if not (
-                    math.isfinite(start)
-                    and math.isfinite(end)
-                    and 0 <= start < end <= videos["main"].duration_s + 0.001
-                ):
-                    raise RuntimeError(
-                        "The pipeline returned an invalid segment interval."
-                    )
-                from batch_utils.segment_output import frame_span
-
-                first, last = frame_span(videos["main"], start, end)
-                rows.append(
-                    dict(
-                        start_s=start,
-                        end_s=end,
-                        start_frame=first,
-                        end_frame=last,
-                        metadata=item["metadata"],
-                        segmentation_provenance=item["metadata"].get(
-                            "segmentation_provenance", "fine"
-                        ),
-                    )
-                )
             runtime_event(
-                "segmentation_complete", windows=len(audit), segments=len(rows)
+                "segmentation_complete", windows=len(audit), segments=len(segments)
             )
-            result = dict(
-                schema_version="flora_tempseg_v1",
-                duration_s=videos["main"].duration_s,
-                segments=rows,
-                elapsed_s=round(time.monotonic() - started, 2),
-                source_clock="seconds relative to the first native source presentation timestamp",
-                profile=profile,
-                camera_roles=list(videos),
-                model_revisions={
-                    key: MODELS[key] for key in ("tempseg", "tempseg_base")
-                },
-                input_sha256={role: video.sha256 for role, video in videos.items()},
-            )
-            result["input_type"] = "parquet" if args.dataset_path else "video"
-            result["frame_clock"] = (
-                "zero-based native frame position; end_frame is exclusive"
-            )
+            dataset_source = None
             if args.dataset_path:
-                result["dataset_source"] = dict(
+                dataset_source = dict(
                     episode_index=kwargs["episode"][0],
                     camera=args.image_key,
                     path=str(kwargs["episode"][1]),
                 )
-            if args.include_flags:
-                from batch_utils.segment_output import boundary_flags
-
-                result["flags"] = boundary_flags(
-                    rows, len(videos["main"].pts_us), args.flag_merge_gap
-                )
+            result = segment_result(
+                videos,
+                profile,
+                segments,
+                time.monotonic() - started,
+                dataset_source=dataset_source,
+                flag_merge_gap=args.flag_merge_gap if args.include_flags else None,
+            )
             if args.include_audit:
                 result["temporal_windows"] = audit
             output.parent.mkdir(parents=True, exist_ok=True)
             with output.open("w" if args.overwrite else "x") as f:
                 json.dump(result, f, ensure_ascii=False, indent=2, allow_nan=False)
                 f.write("\n")
-            print(json.dumps({"output": str(output), "segments": len(rows)}))
+            print(json.dumps({"output": str(output), "segments": len(segments)}))
         return 0
     except (OSError, ValueError, RuntimeError, KeyError) as error:
         print(f"FLORA inference failed: {error}", file=sys.stderr)

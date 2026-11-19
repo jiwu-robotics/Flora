@@ -12,10 +12,9 @@ starting frame and episode-relative offset in `manifest.json`. Outputs from
 inference have their segment times adjusted to episode-relative seconds, and
 include `episode_source`. The adapter checks episode frame counts, missing
 frames and Flora input constraints. All dataset modes prepare and validate at
-most one upcoming part in the background while inference runs serially. Video
-modes still reload their models for each part; only direct Parquet TempSeg
-currently reuses one model session. Incomplete segment statuses cause an
-error. UMI videos are passed through unchanged; oversized or otherwise invalid
+most one upcoming part in the background while inference runs serially. Every
+dataset mode reuses one model session per stage across all parts. Incomplete
+segment statuses cause an error. UMI videos are passed through unchanged; oversized or otherwise invalid
 videos are reported by Flora rather than silently modified.
 
 The default mode only performs CPU input validation. Each invocation writes
@@ -78,12 +77,16 @@ require a suitable GPU and an approved model cache.
 
 ## Model selection
 
-With `--run`, `--mode both` (the default) runs TempSeg followed by Captioner;
+With `--run`, `--mode both` (the default) runs TempSeg over all selected
+parts, releases its model, then runs Captioner over all parts. Intermediate
+TempSeg results keep part-relative coordinates under `<output>/segments/`.
+After segmentation completes, that directory can be used with
+`--mode captioner --segments-dir` and a new output directory.
 `--mode tempseg` runs segmentation only. To run just Captioner, supply
 `--mode captioner --segments-dir /path/to/tempseg/run`. The directory must
 contain the matching TempSeg results for every selected part. The adapter
 checks episode metadata, video hashes and profile before using those intervals;
-TempSeg times are converted back from episode-relative to part-relative time.
+Standalone TempSeg outputs are converted back from episode-relative to part-relative time.
 Without `--run`, only input validation is performed.
 
 In Kestra, select `model_mode` and set `inference=true`. For `captioner`, set

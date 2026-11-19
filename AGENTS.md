@@ -56,7 +56,7 @@ Profiles: `human` (one egocentric camera), `yam` (parallel grippers), `dex` (dex
 ## Inputs
 
 - Pass the native videos. Do not resample, trim or re-encode them unless a command fails (see Troubleshooting).
-- Annotation: each video at most 120 s, 256 MiB and 4096 px per side, at least 4 FPS, one video stream. Split
+- Annotation: each video at most 120 s, 708 MiB and 4096 px per side, at least 4 FPS, one video stream. Split
   longer videos and offset each part's times. Wrist videos must have the main video's frame timestamps, frame
   count and duration.
 - Annotation jobs (JSONL, paths relative to the file):
@@ -106,6 +106,6 @@ Profiles: `human` (one egocentric camera), `yam` (parallel grippers), `dex` (dex
 - `Video exceeds 120 seconds or 7200 frames` (annotation): split the video.
 - CUDA out of memory: the models need a whole 80 GB GPU; check `nvidia-smi` for other processes.
 - The first Rewarder run compiles GPU kernels for several minutes; that is not a hang.
-- Annotation is slow by design: TempSeg spends about 4 minutes on the CPU after `Loading weights`, and both
-  models load again for every video. A 107 s video took 23 minutes on one H100 (first run, with downloads).
+- Annotation can spend several minutes loading TempSeg weights. JSONL jobs and Jiwu dataset runs reuse one
+  model session per stage. A single 107 s video took 23 minutes on one H100 (first run, with downloads).
 - `pip` cannot find `decord` on arm64: only x86_64 is validated.

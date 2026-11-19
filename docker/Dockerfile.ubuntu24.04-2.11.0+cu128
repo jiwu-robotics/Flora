@@ -1,10 +1,6 @@
 # syntax=docker/dockerfile:1
 FROM docker.m.daocloud.io/nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04
 
-ARG HTTP_PROXY
-ARG HTTPS_PROXY
-ARG NO_PROXY
-
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -59,6 +55,7 @@ ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 
 # Pin the complete validated dependency graph; PyTorch hosts its CUDA wheels
 # separately from the default Python package index.
+# Read BuildKit's predefined proxy variables from the shell environment.
 RUN <<'REQUIREMENTS'
 set -e
 export NO_PROXY="${NO_PROXY:+${NO_PROXY},}pypi.nvidia.com,pypi.nvidia.cn,developer.download.nvidia.com,download.pytorch.org,download-r2.pytorch.org"
@@ -150,13 +147,14 @@ RUN uv pip install --python "${VIRTUAL_ENV}/bin/python" -r requirements/dev.txt 
     && uv pip check --python "${VIRTUAL_ENV}/bin/python" \
     && uv cache clean
 
-COPY captioner/ captioner/
-COPY docker/download_tempseg.py docker/download_tempseg.py
-COPY LICENSE LICENSE
 COPY requirements/jiwu.txt requirements/jiwu.txt
 RUN uv pip install --python "${VIRTUAL_ENV}/bin/python" -r requirements/jiwu.txt \
     && uv pip check --python "${VIRTUAL_ENV}/bin/python" \
     && uv cache clean
+
+COPY captioner/ captioner/
+COPY docker/download_tempseg.py docker/download_tempseg.py
+COPY LICENSE LICENSE
 COPY src/ src/
 ENV FLORA_MODEL_CACHE=/model_zoo/flora/models \
     HF_HOME=/model_zoo/huggingface \

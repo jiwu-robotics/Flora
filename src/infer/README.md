@@ -59,6 +59,7 @@ paths to the installation before deployment:
 | --- | --- | --- |
 | `/mnt/sdb/jiwu-dagger` | `/data/jiwu-dagger` | Dataset and results |
 | `/mnt/sdb/jiwu-umi` | `/data/jiwu-umi` | Dataset and results |
+| `/mnt/sdb/datasets` | `/data/datasets` | Standard datasets and results |
 | `/mnt/sdb/.datapilot-modelzoo` | `/model_zoo` | Prepared model cache, GPU task only |
 
 Create the intended host directories with suitable permissions beforehand. A path
@@ -67,8 +68,10 @@ binds the model cache directly; no Compose cache override is required. Existing
 results and model data remain in place; changing this example does not migrate or
 remove any installation's data.
 
-The workflow defaults to TempSeg GPU inference on all UMI parts. With `dagger`
-and `tempseg`, it reads Parquet directly in bounded parts without preparing AVI
+Set `dataset_dir` to a directory relative to the mount selected by `dataset`,
+or to an absolute host path below the corresponding mount or `/mnt/sdb/datasets`.
+The workflow defaults to TempSeg GPU inference on all parts in the supplied UMI
+directory. With `dagger` and `tempseg`, it reads Parquet directly in bounded parts without preparing AVI
 files, reuses one model session, and prefetches at most one part across episodes on a reader thread. Set `inference`
 to `false` for CPU validation only, select `dagger`, or set `max_parts` to a
 positive value to limit the number of parts. Outputs are stored under

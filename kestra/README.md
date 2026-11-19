@@ -1,6 +1,6 @@
 # Jiwu Flora Kestra 工作流
 
-[`jiwu_flora.yaml`](jiwu_flora.yaml) 定义 `flora.jiwu / jiwu_flora`。它读取 Jiwu LeRobot 数据集，先校验输入，再按所选模式运行 Flora；默认使用一张 GPU 对 UMI 数据集的全部 episode 运行 TempSeg。执行 ID 由 Kestra 生成，每次执行使用独立输出目录。
+[`jiwu_flora.yaml`](jiwu_flora.yaml) 定义 `flora.jiwu / jiwu_flora`。它读取指定目录下的 LeRobot v2.1 数据集，先校验输入，再按所选模式运行 Flora。默认数据类型为 UMI，使用一张 GPU 对所选目录的全部 episode 运行 TempSeg。执行 ID 由 Kestra 生成，每次执行使用独立输出目录。
 
 ## 环境与路径
 
@@ -10,9 +10,10 @@
 | --- | --- | --- |
 | UMI 数据集父目录 | `/mnt/sdb/jiwu-umi` | `/data/jiwu-umi` |
 | DAgger 数据集父目录 | `/mnt/sdb/jiwu-dagger` | `/data/jiwu-dagger` |
+| 标准数据集父目录 | `/mnt/sdb/datasets` | `/data/datasets` |
 | 模型缓存（仅推理任务） | `/mnt/sdb/.datapilot-modelzoo` | `/model_zoo` |
 
-宿主机路径及下方数据集目录名写在 YAML 中；部署到其他环境时需要相应修改。容器以 root 运行，生成文件的属主可能是 root。
+宿主机挂载路径写在 YAML 中；部署到其他环境时需要相应修改。容器以 root 运行，生成文件的属主可能是 root。
 
 ## 输入接口
 
@@ -20,21 +21,26 @@
 
 | 参数 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `dataset` | SELECT | `umi` | `umi` 或 `dagger`，选择下方对应的数据集根目录。 |
+| `dataset` | SELECT | `umi` | `umi` 或 `dagger`，选择数据适配器和对应挂载根目录。 |
+| `dataset_dir` | STRING | 必填 | 相对于所选类型挂载的路径，或标准数据集挂载及所选类型挂载下的宿主机绝对路径。 |
 | `max_parts` | INT | `0` | 最多处理的片段数；`0` 表示全部。 |
 | `inference` | BOOL | `true` | `true` 先验证再运行 GPU 推理；`false` 仅进行 CPU 输入验证。 |
 | `model_mode` | SELECT | `tempseg` | `tempseg` 只做时间分段；`both` 依次运行 TempSeg 和 Captioner；`captioner` 使用已有分段生成描述。仅推理时生效。 |
 | `segments_execution_id` | STRING | 空 | `captioner` 模式必填：同一数据集先前成功的 TempSeg 执行 ID，须与所选片段匹配；只允许字母、数字、下划线和连字符。 |
 
-数据集根目录当前固定为：
+例如，设置 `dataset=dagger` 和 `dataset_dir=Robot_data_liqian_20261030_174559`
+会读取 `/mnt/sdb/jiwu-dagger/Robot_data_liqian_20261030_174559`。
+对于标准目录 `/mnt/sdb/datasets/lab_drag_10h/Robot_data_pibiao_20261104_161423/`，
+将完整路径填入 `dataset_dir`，并选择 `dataset=dagger` 读取 Parquet 中的 `high_cam`。
+目录必须存在，并在解析符号链接后仍位于对应挂载根目录下。
 
 ```text
 /mnt/sdb/
-├── jiwu-umi/Robot_data_Bing_20261111_144059/          # dataset=umi
+├── jiwu-umi/Robot_data_Bing_20261111_144059/          # dataset=umi, dataset_dir=Robot_data_Bing_20261111_144059
 │   ├── meta/（info.json、episodes.jsonl 等）
 │   └── videos/chunk-*/observation.images.ego_l/
 │       └── episode_*.mp4
-└── jiwu-dagger/Robot_data_liqian_20261030_174559/     # dataset=dagger
+└── jiwu-dagger/Robot_data_liqian_20261030_174559/     # dataset=dagger, dataset_dir=Robot_data_liqian_20261030_174559
     ├── meta/（info.json、episodes.jsonl 等）
     └── data/chunk-*/
         └── episode_*.parquet

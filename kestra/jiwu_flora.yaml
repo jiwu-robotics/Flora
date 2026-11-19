@@ -8,6 +8,11 @@ inputs:
     type: SELECT
     values: [dagger, umi]
     defaults: umi
+    description: Dataset type and corresponding mount.
+  - id: dataset_dir
+    type: STRING
+    required: true
+    description: Dataset directory relative to its type mount, or an absolute host path inside an allowed dataset mount.
   - id: max_parts
     type: INT
     defaults: 0
@@ -25,6 +30,35 @@ inputs:
     type: STRING
     required: false
     description: TempSeg execution ID required for captioner mode.
+variables:
+  resolve_dataset_dir: |
+    case "$DATASET_KIND" in
+      dagger|umi) dataset_root="/data/jiwu-$DATASET_KIND" ;;
+      *) echo "Unsupported dataset type." >&2; exit 2 ;;
+    esac
+    host_root="/mnt/sdb/jiwu-$DATASET_KIND"
+    case "$DATASET_DIR" in
+      /mnt/sdb/datasets/*)
+        dataset_root=/data/datasets
+        relative_dir=${DATASET_DIR#/mnt/sdb/datasets/}
+        ;;
+      "$host_root"/*)
+        relative_dir=${DATASET_DIR#"$host_root"/}
+        ;;
+      ""|/*)
+        echo "dataset_dir must be relative to the selected type mount or a supported absolute host path." >&2
+        exit 2
+        ;;
+      *) relative_dir=$DATASET_DIR ;;
+    esac
+    if ! dataset=$(realpath -e -- "$dataset_root/$relative_dir") || [ ! -d "$dataset" ]; then
+      echo "dataset_dir must identify an existing directory." >&2
+      exit 2
+    fi
+    case "$dataset" in
+      "$dataset_root"/*) ;;
+      *) echo "dataset_dir must resolve below its dataset mount." >&2; exit 2 ;;
+    esac
 tasks:
   - id: validate
     type: io.kestra.plugin.scripts.shell.Commands
@@ -40,8 +74,10 @@ tasks:
       volumes:
         - /mnt/sdb/jiwu-dagger:/data/jiwu-dagger
         - /mnt/sdb/jiwu-umi:/data/jiwu-umi
+        - /mnt/sdb/datasets:/data/datasets
     env:
       DATASET_KIND: "{{ inputs.dataset }}"
+      DATASET_DIR: "{{ inputs.dataset_dir }}"
       MAX_PARTS: "{{ inputs.max_parts }}"
       EXECUTION_ID: "{{ execution.id }}"
       MODEL_MODE: "{{ inputs.model_mode }}"
@@ -49,11 +85,7 @@ tasks:
       - |
         set -eu
         kestra_output="$PWD/kestra-output"
-        case "$DATASET_KIND" in
-          dagger) dataset=/data/jiwu-dagger/Robot_data_liqian_20261030_174559 ;;
-          umi) dataset=/data/jiwu-umi/Robot_data_Bing_20261111_144059 ;;
-          *) exit 2 ;;
-        esac
+        {{ vars.resolve_dataset_dir }}
         cd /app
         set -- --kind "$DATASET_KIND" --dataset "$dataset" --max-parts "$MAX_PARTS" --output "$dataset/tempseg/$EXECUTION_ID"
         if [ "$DATASET_KIND" = dagger ] && [ "$MODEL_MODE" = tempseg ]; then
@@ -80,9 +112,11 @@ tasks:
       volumes:
         - /mnt/sdb/jiwu-dagger:/data/jiwu-dagger
         - /mnt/sdb/jiwu-umi:/data/jiwu-umi
+        - /mnt/sdb/datasets:/data/datasets
         - /mnt/sdb/.datapilot-modelzoo:/model_zoo
     env:
       DATASET_KIND: "{{ inputs.dataset }}"
+      DATASET_DIR: "{{ inputs.dataset_dir }}"
       MAX_PARTS: "{{ inputs.max_parts }}"
       EXECUTION_ID: "{{ execution.id }}"
       MODEL_MODE: "{{ inputs.model_mode }}"
@@ -93,11 +127,7 @@ tasks:
       - |
         set -eu
         kestra_output="$PWD/kestra-output"
-        case "$DATASET_KIND" in
-          dagger) dataset=/data/jiwu-dagger/Robot_data_liqian_20261030_174559 ;;
-          umi) dataset=/data/jiwu-umi/Robot_data_Bing_20261111_144059 ;;
-          *) exit 2 ;;
-        esac
+        {{ vars.resolve_dataset_dir }}
         cd /app
         set -- --kind "$DATASET_KIND" --dataset "$dataset" --max-parts "$MAX_PARTS" --output "$dataset/tempseg/$EXECUTION_ID" --run --mode "$MODEL_MODE"
         if [ "$DATASET_KIND" = dagger ] && [ "$MODEL_MODE" = tempseg ]; then

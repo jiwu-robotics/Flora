@@ -1,14 +1,11 @@
-"""Pod bootstrap: reuse the stage driver packaged in the immutable Flora image."""
+"""Run the shared workflow stage in an Airflow task pod."""
 
 import hashlib
 import json
 import os
 import runpy
 import sys
-import tempfile
 from pathlib import Path
-
-import yaml
 
 HOST_MOUNTS = {
     "/mnt/sdb/jiwu-dagger": "/data/jiwu-dagger",
@@ -60,20 +57,15 @@ def main():
         raise ValueError("Artifact path escapes the dataset")
     os.chdir("/app")
     sys.path.insert(0, "/app")
-    flow = yaml.safe_load(Path("/app/kestra/jiwu_flora.yaml").read_text())
-    driver = flow["variables"]["stage_driver"]
+
     print(
         json.dumps(
             {"execution_id": execution, "stage": stage, "artifacts": str(artifacts)}
         ),
         flush=True,
     )
-    # No source interpolation into shell commands; parameters remain environment values.
-    with tempfile.TemporaryDirectory(prefix="flora-stage-") as temporary:
-        script = Path(temporary) / "driver.py"
-        script.write_text(driver)
-        sys.argv = [str(script), str(root), str(artifacts)]
-        runpy.run_path(str(script), run_name="__main__")
+    sys.argv = ["src.infer.workflow_stage", str(root), str(artifacts)]
+    runpy.run_module("src.infer.workflow_stage", run_name="__main__")
     print(
         json.dumps(
             {

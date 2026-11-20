@@ -12,7 +12,7 @@ from unittest.mock import patch
 import yaml
 
 REPO = Path(__file__).resolve().parents[1]
-FLOW = yaml.safe_load((REPO / "kestra/jiwu_flora.yaml").read_text())
+FLOW = yaml.safe_load((REPO / "dag/kestra/jiwu_flora.yaml").read_text())
 DRIVER = compile(FLOW["variables"]["stage_driver"], "kestra-stage-driver", "exec")
 
 

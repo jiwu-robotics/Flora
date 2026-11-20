@@ -40,7 +40,7 @@ The GPU run requires the hardware and cache described in the repository
 
 ## Local Kestra
 
-`kestra/jiwu_flora.yaml` uses the standard
+`dag/kestra/jiwu_flora.yaml` uses the standard
 [Kestra Docker Task Runner](https://kestra.io/docs/task-runners/types/docker-task-runner)
 with the host engine at `unix:///var/run/docker.sock`. Both tasks use the required `flora_image` input: a preloaded full image ID or
 repository digest containing the current `/app/src/infer` and annotation programs.

@@ -53,7 +53,7 @@
 
 UMI 使用原始 `ego_l` 视频和 `human` profile，每个 episode 最长 90 秒，视频文件最大 708 MiB。DAgger 从 Parquet 的 `observation.images.high_cam` 读取 JPEG 帧并使用 `yam` profile。DAgger 的 `tempseg` 模式直接读取 Parquet，`both` 和 `captioner` 模式使用 MJPEG AVI。DAgger 片段最长 60 秒，JPEG 数据最多 240 MiB。
 
-两种数据集都在后台预取并校验下一个片段，GPU 串行执行，每个阶段复用一个模型会话。`both` 先完成所有片段的 TempSeg，再释放 TempSeg 并加载 Captioner。输入约束见 [Jiwu 数据集适配器指南](../src/infer/README.md)。
+两种数据集都在后台预取并校验下一个片段，GPU 串行执行，每个阶段复用一个模型会话。`both` 先完成所有片段的 TempSeg，再释放 TempSeg 并加载 Captioner。输入约束见 [Jiwu 数据集适配器指南](../../src/infer/README.md)。
 
 ## 执行与输出接口
 

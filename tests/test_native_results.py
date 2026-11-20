@@ -101,11 +101,17 @@ class NativeResultsTests(unittest.TestCase):
         import pyarrow as pa
         import pyarrow.parquet as pq
 
-        pq.write_table(pa.table({
-            "frame_index": [0, 1, 2], "episode_index": [0, 0, 0],
-            "relative_timestamp_sec": [0.0, 0.25, 0.5],
-            "timestamp": [100.0, 100.25, 100.75],
-        }), self.path)
+        pq.write_table(
+            pa.table(
+                {
+                    "frame_index": [0, 1, 2],
+                    "episode_index": [0, 0, 0],
+                    "relative_timestamp_sec": [0.0, 0.25, 0.5],
+                    "timestamp": [100.0, 100.25, 100.75],
+                }
+            ),
+            self.path,
+        )
         video = SimpleNamespace(pts_us=(0, 250000, 500000))
         verify_row_clock(self.path, 0, 3, video, direct_parquet=True)
         with self.assertRaisesRegex(ValueError, "presentation PTS"):

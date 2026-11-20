@@ -93,7 +93,14 @@ def merged_ranges(ranges):
 
 
 def verify_row_clock(
-    path, episode_index, frame_count, video, start_frame=0, offset_s=0, *, direct_parquet=False
+    path,
+    episode_index,
+    frame_count,
+    video,
+    start_frame=0,
+    offset_s=0,
+    *,
+    direct_parquet=False,
 ):
     """Prove row order and normalized source timestamps match presentation PTS.
 
@@ -106,8 +113,11 @@ def verify_row_clock(
     parquet = pq.ParquetFile(path)
     columns = parquet.schema_arrow.names
     clock = (
-        "relative_timestamp_sec" if direct_parquet
-        else "timestamp" if "timestamp" in columns else "relative_timestamp_sec"
+        "relative_timestamp_sec"
+        if direct_parquet
+        else "timestamp"
+        if "timestamp" in columns
+        else "relative_timestamp_sec"
     )
     if not {clock, "frame_index", "episode_index"} <= set(columns):
         raise ValueError("Cannot prove source row to presentation timestamp mapping")

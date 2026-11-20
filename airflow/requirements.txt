@@ -1,0 +1,5 @@
+# Python 3.12; official Airflow release constraints.
+-c https://raw.githubusercontent.com/apache/airflow/constraints-3.1.0/constraints-3.12.txt
+# Install in the Airflow control-plane image, not the Flora inference image.
+apache-airflow==3.1.0
+apache-airflow-providers-cncf-kubernetes==10.8.1

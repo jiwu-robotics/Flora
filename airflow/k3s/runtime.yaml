@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: flora
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: flora-task
+  namespace: flora
+automountServiceAccountToken: false
+---
+# Bind the identity that executes KubernetesPodOperator, not the inference Pod.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: flora-pod-launcher
+  namespace: flora
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [create, get, list, watch, patch, delete]
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [events]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: airflow-flora-launcher
+  namespace: flora
+subjects:
+  # Replace with your Airflow worker SA; LocalExecutor uses the scheduler SA.
+  - kind: ServiceAccount
+    name: airflow-worker
+    namespace: airflow
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: flora-pod-launcher
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: flora-offline
+  namespace: flora
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: flora
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress: []

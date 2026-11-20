@@ -97,6 +97,20 @@ class NativeResultsTests(unittest.TestCase):
             jsonschema.Draft202012Validator(schema).validate(doc)
         return doc, doc["results"]["source-id"]["chunk-007"]["0"]
 
+    def test_direct_parquet_preserves_distinct_recording_clock(self):
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        pq.write_table(pa.table({
+            "frame_index": [0, 1, 2], "episode_index": [0, 0, 0],
+            "relative_timestamp_sec": [0.0, 0.25, 0.5],
+            "timestamp": [100.0, 100.25, 100.75],
+        }), self.path)
+        video = SimpleNamespace(pts_us=(0, 250000, 500000))
+        verify_row_clock(self.path, 0, 3, video, direct_parquet=True)
+        with self.assertRaisesRegex(ValueError, "presentation PTS"):
+            verify_row_clock(self.path, 0, 3, video)
+
     def test_complete_empty_detection_and_episode_flags(self):
         collector = self.collector()
         collector.add(*self.part(0, 50, [(0, 49)]))

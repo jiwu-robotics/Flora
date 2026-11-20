@@ -93,18 +93,22 @@ def merged_ranges(ranges):
 
 
 def verify_row_clock(
-    path, episode_index, frame_count, video, start_frame=0, offset_s=0
+    path, episode_index, frame_count, video, start_frame=0, offset_s=0, *, direct_parquet=False
 ):
     """Prove row order and normalized source timestamps match presentation PTS.
 
-    LeRobot timestamp is the presentation clock. Older DAgger exports use
-    relative_timestamp_sec. Never substitute a nominal frame rate for UMI PTS.
+    Direct Parquet decoding uses relative_timestamp_sec even when timestamp
+    records a wall clock with capture gaps. External video keeps its original
+    timestamp contract; neither path substitutes nominal frame-rate timing.
     """
     import pyarrow.parquet as pq
 
     parquet = pq.ParquetFile(path)
     columns = parquet.schema_arrow.names
-    clock = "timestamp" if "timestamp" in columns else "relative_timestamp_sec"
+    clock = (
+        "relative_timestamp_sec" if direct_parquet
+        else "timestamp" if "timestamp" in columns else "relative_timestamp_sec"
+    )
     if not {clock, "frame_index", "episode_index"} <= set(columns):
         raise ValueError("Cannot prove source row to presentation timestamp mapping")
     if parquet.metadata.num_rows != frame_count:
@@ -254,6 +258,7 @@ class Results:
             video,
             job["start_frame"],
             job["offset_s"],
+            direct_parquet=row["source"]["input_type"] == "parquet",
         )
 
     def add(self, job, video, result=None):

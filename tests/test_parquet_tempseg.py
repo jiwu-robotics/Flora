@@ -193,6 +193,9 @@ class ParquetTests(unittest.TestCase):
         from batch_utils import models, pipeline, dataset as reader
 
         pq.write_table(pa.Table.from_pylist(self.rows), self.path)
+        (self.root / "meta/episodes.jsonl").write_text(
+            json.dumps({"episode_index": 0, "length": 12}) + "\n"
+        )
         args = SimpleNamespace(
             dataset=self.root,
             output=self.root / "out",
@@ -245,6 +248,16 @@ class ParquetTests(unittest.TestCase):
             adapter.run(args)
             self.assertEqual(predict.call_count, 3)
             self.assertFalse(list(self.root.rglob("*.avi")))
+            aggregate = json.loads((args.output / "results.json").read_text())
+            self.assertTrue(aggregate["complete"])
+            episode = aggregate["results"][self.root.name]["chunk-000"]["0"]
+            self.assertEqual(len(episode["segments"]), 3)
+            self.assertEqual(
+                episode["processed_ranges"], [{"start_frame": 0, "end_frame": 12}]
+            )
+            self.assertEqual(
+                [s["start_frame"] for s in episode["segments"]], [0, 5, 10]
+            )
 
     def test_streaming_avoids_single_frame_tail(self):
         from batch_utils import dataset as reader

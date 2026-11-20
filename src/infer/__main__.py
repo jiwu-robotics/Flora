@@ -2,11 +2,12 @@
 
 import argparse
 import json
-from pathlib import Path
+import math
 import subprocess
 import sys
 import uuid
 from contextlib import closing
+from pathlib import Path
 
 from .direct import atomic_json
 from .prefetch import prefetch_parts
@@ -23,12 +24,14 @@ def rows(path):
 
 
 def source_path(root, template, episode, chunks_size, **extra):
-    path = (
-        root
-        / template.format(
+    relative = Path(
+        template.format(
             episode_chunk=episode // chunks_size, episode_index=episode, **extra
         )
-    ).resolve(strict=True)
+    )
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ValueError("Dataset path template must stay relative to root")
+    path = (root / relative).resolve(strict=True)
     if not path.is_relative_to(root):
         raise ValueError(f"dataset path escapes root: {path}")
     return path
@@ -38,18 +41,22 @@ def dataset(root, kind, selected, image_key=None):
     info = json.loads((root / "meta/info.json").read_text(encoding="utf-8"))
     fps, chunk = info["fps"], info["chunks_size"]
     if (
-        not isinstance(fps, (int, float))
+        type(fps) not in (int, float)
+        or not math.isfinite(fps)
         or fps < 4
-        or not isinstance(chunk, int)
+        or type(chunk) is not int
         or chunk < 1
     ):
         raise ValueError("Invalid fps or chunk size in dataset metadata")
     episodes = list(rows(root / "meta/episodes.jsonl"))
     ids = [x["episode_index"] for x in episodes]
-    if len(set(ids)) != len(ids) or any(not isinstance(x, int) or x < 0 for x in ids):
+    if len(set(ids)) != len(ids) or any(type(x) is not int or x < 0 for x in ids):
         raise ValueError("Invalid or duplicate episode index")
     if selected is not None:
-        episodes = [x for x in episodes if x["episode_index"] == selected]
+        selected_ids = {selected} if isinstance(selected, int) else set(selected)
+        if selected_ids - set(ids):
+            raise ValueError("Selected episodes are missing from metadata")
+        episodes = [x for x in episodes if x["episode_index"] in selected_ids]
     if not episodes:
         raise ValueError("No matching episodes")
     key = (
@@ -168,9 +175,10 @@ def prepare_video_parts(args, root, mode, media, image_key):
     profile = "yam" if args.kind == "dagger" else "human"
     instruction = getattr(args, "instruction", "")
     produced = 0
-    for episode, path, fps, key in dataset(
-        root, args.kind, args.episode, image_key=image_key
-    ):
+    episodes = getattr(args, "_selected_episodes", None)
+    if episodes is None:
+        episodes = dataset(root, args.kind, args.episode, image_key=image_key)
+    for episode, path, fps, key in episodes:
         remaining = args.max_parts - produced if args.max_parts else 0
         if args.kind == "dagger":
             parts = dagger_parts(path, episode, fps, key, media, remaining)
@@ -213,6 +221,9 @@ def prepare_video_parts(args, root, mode, media, image_key):
                     raise ValueError(
                         f"{path}: decoded frame count differs from episode metadata"
                     )
+                collector = getattr(args, "_results", None)
+                if collector is not None:
+                    collector.validate_video(job, videos["main"])
                 produced += 1
                 yield job, videos, canonical, inspection
                 if args.max_parts and produced >= args.max_parts:
@@ -310,6 +321,9 @@ def run_video_stages(args, mode, output, prepared):
                     atomic_json(checkpoints / path.name, result)
                 else:
                     write_episode_result(output, job, result, captions=False)
+                    collector = getattr(args, "_results", None)
+                    if collector is not None:
+                        collector.add(job, videos["main"], result)
             entries.append(job)
 
     if mode == "both":
@@ -369,67 +383,99 @@ def run(args):
         raise ValueError(
             "--image-key requires --kind dagger and a nonempty column name"
         )
-    if direct:
-        from .direct import run_direct
-
-        return run_direct(
-            args,
-            root,
-            output,
-            dataset(root, args.kind, args.episode, image_key=image_key),
-        )
     captioner = str(ROOT / "captioner")
     if captioner not in sys.path:
         sys.path.insert(0, captioner)
-    with closing(
-        prefetch_parts(
-            prepare_video_parts(args, root, mode, media, image_key),
-            limit=args.max_parts,
-        )
-    ) as parts:
-        entries = (
-            run_video_stages(args, mode, output, parts)
-            if args.run
-            else [job for job, *_ in parts]
-        )
+    collector = None
+    if mode == "tempseg":
+        from .results import Results, snapshot
 
-    manifest.write_text(
-        json.dumps(
-            {
-                "dataset": str(root),
-                "kind": args.kind,
-                "validated": True,
-                "inference": args.run,
-                "mode": mode if args.run else "validate",
-                "parts": entries,
-            },
-            indent=2,
+        if getattr(args, "resume", False):
+            (output / "results.json").unlink(missing_ok=True)
+        metadata = snapshot(root, ["meta/info.json", "meta/episodes.jsonl"])
+        selected = getattr(args, "episodes", None) or args.episode
+        episodes = list(dataset(root, args.kind, selected, image_key=image_key))
+        collector = Results(args, root, output, episodes, metadata)
+        args._results = collector
+        args._selected_episodes = episodes
+    try:
+        if direct:
+            from .direct import run_direct
+
+            run_direct(args, root, output, episodes)
+            collector.write()
+            return
+        with closing(
+            prefetch_parts(
+                prepare_video_parts(args, root, mode, media, image_key),
+                limit=args.max_parts,
+            )
+        ) as parts:
+            if args.run:
+                entries = run_video_stages(args, mode, output, parts)
+            else:
+                entries = []
+                for job, videos, *_ in parts:
+                    if collector is not None:
+                        collector.add(job, videos["main"])
+                    entries.append(job)
+        manifest.write_text(
+            json.dumps(
+                {
+                    "dataset": str(root),
+                    "kind": args.kind,
+                    "validated": True,
+                    "inference": args.run,
+                    "mode": mode if args.run else "validate",
+                    "parts": entries,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
         )
-        + "\n",
-        encoding="utf-8",
-    )
-    print(
-        json.dumps(
-            {
-                "manifest": str(manifest),
-                "validated_parts": len(entries),
-                "inference": args.run,
-            }
-        ),
-        flush=True,
-    )
+        print(
+            json.dumps(
+                {
+                    "manifest": str(manifest),
+                    "validated_parts": len(entries),
+                    "inference": args.run,
+                }
+            ),
+            flush=True,
+        )
+        if collector is not None:
+            collector.write()
+    except Exception:
+        if collector is not None:
+            try:
+                collector.write(failed=True)
+            except (OSError, ValueError, RuntimeError, KeyError, TypeError):
+                print("Unable to write native diagnostic results", file=sys.stderr)
+        raise
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--dataset", type=Path, required=True)
+    p.add_argument(
+        "--dataset-key",
+        help="Dataset identity echoed in native TempSeg results (default: directory name)",
+    )
     p.add_argument("--kind", choices=("dagger", "umi"), required=True)
     p.add_argument(
         "--output",
         type=Path,
         help="Output directory (default: a new directory under DATASET/flora_annotations)",
     )
-    p.add_argument("--episode", type=int)
+    selection = p.add_mutually_exclusive_group()
+    selection.add_argument("--episode", type=int)
+    selection.add_argument(
+        "--episodes",
+        type=int,
+        nargs="+",
+        help="Select multiple episodes for one native TempSeg results file",
+    )
     p.add_argument(
         "--max-parts", type=int, default=0, help="Maximum parts to process, 0 means all"
     )
@@ -474,8 +520,20 @@ def main():
         help="Resume matching direct Parquet results in the same output directory.",
     )
     args = p.parse_args()
+    if args.episodes is not None and (
+        args.mode != "tempseg"
+        or any(i < 0 for i in args.episodes)
+        or len(set(args.episodes)) != len(args.episodes)
+    ):
+        p.error(
+            "--episodes requires --mode tempseg and unique nonnegative episode indices"
+        )
     if args.resume and (not args.direct_parquet or not args.run or args.output is None):
         p.error("--resume requires --direct-parquet --run and --output")
+    if args.dataset_key is not None and (
+        not args.dataset_key.strip() or args.mode != "tempseg"
+    ):
+        p.error("--dataset-key requires --mode tempseg and a nonempty value")
     if args.flag_merge_gap < 0:
         p.error("--flag-merge-gap must be nonnegative")
     if args.segments_dir and (not args.run or args.mode != "captioner"):

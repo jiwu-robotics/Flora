@@ -1,0 +1,403 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Flora native TempSeg results v1",
+  "$comment": "Cross-field selection equality, coverage, frame bounds, flags and source/model authorization require semantic validation.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "flora_results_v1"
+    },
+    "producer": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "const": "flora"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "models": {
+          "type": "object",
+          "required": [
+            "tempseg"
+          ],
+          "additionalProperties": {
+            "type": "object"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "revision",
+        "models"
+      ],
+      "additionalProperties": false
+    },
+    "mode": {
+      "const": "tempseg"
+    },
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "episode_index": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "max_parts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "inference": {
+          "type": "boolean"
+        },
+        "direct_parquet": {
+          "type": "boolean"
+        },
+        "image_key": {
+          "type": "string"
+        },
+        "include_flags": {
+          "type": "boolean"
+        },
+        "flag_merge_gap": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "instruction": {
+          "type": "string"
+        },
+        "profile": {
+          "enum": [
+            "yam",
+            "human"
+          ]
+        }
+      },
+      "required": [
+        "episode_index",
+        "max_parts",
+        "inference",
+        "direct_parquet",
+        "image_key",
+        "include_flags",
+        "flag_merge_gap",
+        "instruction",
+        "profile"
+      ],
+      "additionalProperties": false
+    },
+    "selection": {
+      "type": "object",
+      "properties": {
+        "dataset_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "episodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "chunk": {
+                "type": "string"
+              },
+              "episode_index": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "chunk",
+              "episode_index"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "dataset_key",
+        "episodes"
+      ],
+      "additionalProperties": false
+    },
+    "coordinates": {
+      "type": "object",
+      "properties": {
+        "frames": {
+          "const": "original_episode_row_index"
+        },
+        "interval": {
+          "const": "half_open"
+        },
+        "seconds": {
+          "const": "relative_to_first_source_presentation_timestamp"
+        },
+        "frame_mapping": {
+          "const": "flora_frame_span_v1"
+        }
+      },
+      "required": [
+        "frames",
+        "interval",
+        "seconds",
+        "frame_mapping"
+      ],
+      "additionalProperties": false
+    },
+    "flags_policy": {
+      "const": "episode_boundaries_v1"
+    },
+    "complete": {
+      "type": "boolean"
+    },
+    "results": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/episode"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "producer",
+    "mode",
+    "parameters",
+    "selection",
+    "coordinates",
+    "flags_policy",
+    "complete",
+    "results"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "path": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+    },
+    "file": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "range": {
+      "type": "object",
+      "properties": {
+        "start_frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_frame": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "start_frame",
+        "end_frame"
+      ],
+      "additionalProperties": false
+    },
+    "segment": {
+      "type": "object",
+      "properties": {
+        "start_frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_frame": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "start_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "end_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "part_id": {
+          "type": "string"
+        },
+        "segmentation_provenance": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "start_frame",
+        "end_frame",
+        "start_s",
+        "end_s",
+        "part_id",
+        "segmentation_provenance"
+      ],
+      "additionalProperties": false
+    },
+    "episode": {
+      "type": "object",
+      "properties": {
+        "parquet_name": {
+          "$ref": "#/$defs/path"
+        },
+        "frame_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "dagger",
+                "umi"
+              ]
+            },
+            "input_type": {
+              "enum": [
+                "parquet",
+                "video"
+              ]
+            },
+            "camera_key": {
+              "type": "string"
+            },
+            "files": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/file"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "kind",
+            "input_type",
+            "camera_key",
+            "files"
+          ],
+          "additionalProperties": false
+        },
+        "status": {
+          "enum": [
+            "success",
+            "partial",
+            "failed",
+            "not_processed",
+            "validated"
+          ]
+        },
+        "processed_ranges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/range"
+          }
+        },
+        "segments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/segment"
+          }
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "uniqueItems": true
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "parquet_name",
+        "frame_count",
+        "source",
+        "status",
+        "processed_ranges",
+        "segments"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "failed"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "validated",
+                  "not_processed"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "processed_ranges": {
+                "maxItems": 0
+              },
+              "segments": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

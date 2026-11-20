@@ -1,0 +1,177 @@
+# DAG Factory workflow: requires Airflow 3.1.0, Kubernetes provider 10.8.1,
+# and dag-factory 1.0.1. Load this file with the Airflow DAG Factory loader.
+# Configure the flora namespace, service accounts, RBAC, and network policy separately.
+# The Flora image must contain the current src/infer Python modules.
+# Trigger a CPU preflight before GPU inference:
+# airflow dags trigger jiwu_flora --conf '{"flora_image":"<repository>@sha256:<digest>","node_name":"<hostname>","dataset":"dagger","dataset_dir":"<dataset>","inference":false}'
+jiwu_flora:
+  description: Validate Jiwu data and publish complete native Flora results on k3s
+  start_date: '2026-01-01'
+  schedule: null
+  catchup: false
+  max_active_runs: 1
+  tags: [flora, k3s, gpu]
+  params:
+    flora_image:
+      __type__: airflow.sdk.Param
+      type: string
+      pattern: '^[a-zA-Z0-9][a-zA-Z0-9._:/-]*@sha256:[0-9a-f]{64}$'
+    node_name:
+      __type__: airflow.sdk.Param
+      type: string
+      minLength: 1
+      pattern: '^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$'
+    dataset_dir: {__type__: airflow.sdk.Param, type: string, minLength: 1}
+    dataset: {__type__: airflow.sdk.Param, __args__: [umi], enum: [dagger, umi]}
+    dataset_key: {__type__: airflow.sdk.Param, __args__: [''], type: string}
+    episodes:
+      __type__: airflow.sdk.Param
+      __args__: [[]]
+      type: array
+      items: {type: integer, minimum: 0}
+      uniqueItems: true
+    include_flags: {__type__: airflow.sdk.Param, __args__: [true], type: boolean}
+    max_parts: {__type__: airflow.sdk.Param, __args__: [0], type: integer, minimum: 0}
+    inference: {__type__: airflow.sdk.Param, __args__: [true], type: boolean}
+    model_mode: {__type__: airflow.sdk.Param, __args__: [tempseg], enum: [both, tempseg, captioner]}
+    segments_execution_id: {__type__: airflow.sdk.Param, __args__: [''], type: string}
+  tasks:
+    - task_id: validate
+      operator: airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator
+      name: flora-validate
+      namespace: flora
+      kubernetes_conn_id: null
+      in_cluster: true
+      image: '{{ params.flora_image }}'
+      image_pull_policy: Never
+      cmds: [python, -m, src.infer.airflow_stage]
+      env_vars: &env
+        STAGE: validate
+        FLORA_IMAGE: '{{ params.flora_image }}'
+        DATASET_KIND: '{{ params.dataset }}'
+        DATASET_DIR: '{{ params.dataset_dir }}'
+        DATASET_KEY: '{{ params.dataset_key }}'
+        EPISODES_JSON: '{{ params.episodes | tojson }}'
+        INCLUDE_FLAGS: "{{ 'true' if params.include_flags else 'false' }}"
+        MAX_PARTS: '{{ params.max_parts }}'
+        MODEL_MODE: '{{ params.model_mode }}'
+        SEGMENTS_EXECUTION_ID: '{{ params.segments_execution_id }}'
+        FLORA_DAG_ID: '{{ dag.dag_id }}'
+        FLORA_RUN_ID: '{{ run_id }}'
+        HF_HUB_OFFLINE: '1'
+        TRANSFORMERS_OFFLINE: '1'
+        PYTHONUNBUFFERED: '1'
+      labels: {app.kubernetes.io/name: flora, flora-stage: validate}
+      node_selector: &node {kubernetes.io/hostname: '{{ params.node_name }}'}
+      service_account_name: flora-task
+      automount_service_account_token: false
+      security_context: &security {runAsUser: 0, runAsGroup: 0}
+      container_security_context: &container_security
+        allowPrivilegeEscalation: false
+        capabilities: {drop: [ALL]}
+      volumes: &volumes
+        - __type__: kubernetes.client.models.V1Volume
+          name: dagger
+          host_path: {__type__: kubernetes.client.models.V1HostPathVolumeSource, path: /mnt/sdb/jiwu-dagger, type: Directory}
+        - __type__: kubernetes.client.models.V1Volume
+          name: umi
+          host_path: {__type__: kubernetes.client.models.V1HostPathVolumeSource, path: /mnt/sdb/jiwu-umi, type: Directory}
+        - __type__: kubernetes.client.models.V1Volume
+          name: datasets
+          host_path: {__type__: kubernetes.client.models.V1HostPathVolumeSource, path: /mnt/sdb/datasets, type: Directory}
+        - __type__: kubernetes.client.models.V1Volume
+          name: debug
+          host_path: {__type__: kubernetes.client.models.V1HostPathVolumeSource, path: /home/eisoc/data/debug_datapilot, type: Directory}
+      volume_mounts: &mounts
+        - {__type__: kubernetes.client.models.V1VolumeMount, name: dagger, mount_path: /data/jiwu-dagger}
+        - {__type__: kubernetes.client.models.V1VolumeMount, name: umi, mount_path: /data/jiwu-umi}
+        - {__type__: kubernetes.client.models.V1VolumeMount, name: datasets, mount_path: /data/datasets}
+        - {__type__: kubernetes.client.models.V1VolumeMount, name: debug, mount_path: /data/debug_datapilot}
+      container_resources:
+        __type__: kubernetes.client.models.V1ResourceRequirements
+        requests: {cpu: '2', memory: 8Gi}
+        limits: {cpu: '8', memory: 32Gi}
+      get_logs: true
+      log_events_on_failure: true
+      do_xcom_push: false
+      deferrable: false
+      reattach_on_restart: true
+      on_finish_action: delete_pod
+      startup_timeout_seconds: 600
+      schedule_timeout_seconds: 900
+      active_deadline_seconds: 7200
+      execution_timeout: {__type__: datetime.timedelta, hours: 3}
+      termination_grace_period: 60
+      retries: 0
+    - task_id: inference_enabled
+      operator: airflow.providers.standard.operators.bash.BashOperator
+      bash_command: 'if [ "{{ params.inference }}" = "True" ]; then exit 0; else exit 99; fi'
+      skip_on_exit_code: 99
+      retries: 0
+      dependencies: [validate]
+    - task_id: annotate
+      operator: airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator
+      name: flora-annotate
+      namespace: flora
+      kubernetes_conn_id: null
+      in_cluster: true
+      image: '{{ params.flora_image }}'
+      image_pull_policy: Never
+      cmds: [python, -m, src.infer.airflow_stage]
+      env_vars:
+        <<: *env
+        STAGE: annotate
+        FLORA_MODEL_CACHE: /model_zoo/flora/models
+        HF_HOME: /model_zoo/huggingface
+      labels: {app.kubernetes.io/name: flora, flora-stage: annotate}
+      node_selector: *node
+      service_account_name: flora-task
+      automount_service_account_token: false
+      security_context: *security
+      container_security_context: *container_security
+      volumes:
+        - __type__: kubernetes.client.models.V1Volume
+          name: dagger
+          host_path: {__type__: kubernetes.client.models.V1HostPathVolumeSource, path: /mnt/sdb/jiwu-dagger, type: Directory}
+        - __type__: kubernetes.client.models.V1Volume
+          name: umi
+          host_path: {__type__: kubernetes.client.models.V1HostPathVolumeSource, path: /mnt/sdb/jiwu-umi, type: Directory}
+        - __type__: kubernetes.client.models.V1Volume
+          name: datasets
+          host_path: {__type__: kubernetes.client.models.V1HostPathVolumeSource, path: /mnt/sdb/datasets, type: Directory}
+        - __type__: kubernetes.client.models.V1Volume
+          name: debug
+          host_path: {__type__: kubernetes.client.models.V1HostPathVolumeSource, path: /home/eisoc/data/debug_datapilot, type: Directory}
+        - __type__: kubernetes.client.models.V1Volume
+          name: models
+          host_path: {__type__: kubernetes.client.models.V1HostPathVolumeSource, path: /mnt/sdb/.datapilot-modelzoo, type: Directory}
+      volume_mounts:
+        - {__type__: kubernetes.client.models.V1VolumeMount, name: dagger, mount_path: /data/jiwu-dagger}
+        - {__type__: kubernetes.client.models.V1VolumeMount, name: umi, mount_path: /data/jiwu-umi}
+        - {__type__: kubernetes.client.models.V1VolumeMount, name: datasets, mount_path: /data/datasets}
+        - {__type__: kubernetes.client.models.V1VolumeMount, name: debug, mount_path: /data/debug_datapilot}
+        - {__type__: kubernetes.client.models.V1VolumeMount, name: models, mount_path: /model_zoo}
+      container_resources:
+        __type__: kubernetes.client.models.V1ResourceRequirements
+        requests: {cpu: '2', memory: 24Gi, nvidia.com/gpu: '1'}
+        limits: {cpu: '8', memory: 64Gi, nvidia.com/gpu: '1'}
+      full_pod_spec:
+        __type__: kubernetes.client.models.V1Pod
+        spec:
+          __type__: kubernetes.client.models.V1PodSpec
+          containers:
+            - {__type__: kubernetes.client.models.V1Container, name: base}
+          runtime_class_name: nvidia
+      get_logs: true
+      log_events_on_failure: true
+      do_xcom_push: false
+      deferrable: false
+      reattach_on_restart: true
+      on_finish_action: delete_pod
+      startup_timeout_seconds: 600
+      schedule_timeout_seconds: 900
+      active_deadline_seconds: 86400
+      execution_timeout: {__type__: datetime.timedelta, hours: 25}
+      termination_grace_period: 60
+      retries: 0
+      dependencies: [inference_enabled]

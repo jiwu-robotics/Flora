@@ -200,6 +200,8 @@ class ModelModesTests(unittest.TestCase):
                     )
                     with (
                         patch.object(adapter, "dataset", return_value=self.episodes),
+                        patch("src.infer.results.snapshot", return_value=[]),
+                        patch("src.infer.results.Results"),
                         patch.object(adapter, "dagger_parts", side_effect=prepared),
                         patch.object(DataEnginePipeline, "_inputs", side_effect=inputs),
                     ):

@@ -5,10 +5,10 @@ import json
 import os
 import resource
 import sys
-import time
 import tempfile
-from pathlib import Path
+import time
 from contextlib import ExitStack, closing
+from pathlib import Path
 
 from .prefetch import prefetch_parts
 
@@ -62,6 +62,7 @@ def run_direct(args, root, output, episodes):
     from batch_utils.segment_output import boundary_flags, frame_span
 
     resume = getattr(args, "resume", False)
+    collector = getattr(args, "_results", None)
     if args.instruction and len(args.instruction.strip()) > 2000:
         raise ValueError("instruction must be at most 2000 characters")
     code_digest = hashlib.sha256()
@@ -103,6 +104,9 @@ def run_direct(args, root, output, episodes):
             inspection = inspect_episode(videos, "YAM")
             print(json.dumps(inspection, allow_nan=False), flush=True)
             identity = {
+                "native_results_identity": collector.identity_sha256
+                if collector
+                else None,
                 "code_sha256": code_digest.hexdigest(),
                 "source_sha256": source_hash,
                 "chunk_sha256": video.sha256,
@@ -118,6 +122,14 @@ def run_direct(args, root, output, episodes):
             if args.weights_path and resume:
                 raise ValueError("Resume with a custom checkpoint is not supported")
             result_path = output / (name + ".json")
+            if collector is not None:
+                expected = collector.entries[episode["episode_index"]]["source"][
+                    "files"
+                ]
+                relative = path.relative_to(root).as_posix()
+                if {"path": relative, "sha256": source_hash} not in expected:
+                    raise ValueError("Source changed before part processing")
+            result = None
             if args.run:
                 if result_path.exists():
                     existing = json.loads(result_path.read_text(encoding="utf-8"))
@@ -125,6 +137,7 @@ def run_direct(args, root, output, episodes):
                         raise FileExistsError(
                             f"Existing result does not match resume identity: {result_path}"
                         )
+                    result = existing
                 else:
                     import torch
 
@@ -134,7 +147,7 @@ def run_direct(args, root, output, episodes):
                         session = Session(tempseg_weights_path=args.weights_path)
                     torch.cuda.reset_peak_memory_stats()
                     started = time.monotonic()
-                    segments, audit = segment(
+                    segments, _audit = segment(
                         videos,
                         "yam",
                         session,
@@ -217,6 +230,8 @@ def run_direct(args, root, output, episodes):
                         json.dumps({"output": str(result_path), "segments": len(rows)}),
                         flush=True,
                     )
+            if collector is not None:
+                collector.add(job, video, result)
             entries.append(job)
             count += 1
             del videos, video

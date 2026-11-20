@@ -42,9 +42,9 @@ The GPU run requires the hardware and cache described in the repository
 
 `kestra/jiwu_flora.yaml` uses the standard
 [Kestra Docker Task Runner](https://kestra.io/docs/task-runners/types/docker-task-runner)
-with the host engine at `unix:///var/run/docker.sock`. Both tasks use the existing
-`jiwu.robotics/robox-datapilot/flora:latest` image, which contains `/app/src/infer`
-and the annotation programs. Commands run inside that image; no additional worker
+with the host engine at `unix:///var/run/docker.sock`. Both tasks use the required `flora_image` input: a preloaded full image ID or
+repository digest containing the current `/app/src/infer` and annotation programs.
+An old image imported from another machine does not include local source changes. Commands run inside that image; no additional worker
 image or container-launch script is needed.
 
 The trusted Kestra worker needs access to the host socket and Docker runner
@@ -60,6 +60,7 @@ paths to the installation before deployment:
 | `/mnt/sdb/jiwu-dagger` | `/data/jiwu-dagger` | Dataset and results |
 | `/mnt/sdb/jiwu-umi` | `/data/jiwu-umi` | Dataset and results |
 | `/mnt/sdb/datasets` | `/data/datasets` | Standard datasets and results |
+| `/home/eisoc/data/debug_datapilot` | `/data/debug_datapilot` | Debug datasets and results |
 | `/mnt/sdb/.datapilot-modelzoo` | `/model_zoo` | Prepared model cache, GPU task only |
 
 Create the intended host directories with suitable permissions beforehand. A path
@@ -69,13 +70,20 @@ results and model data remain in place; changing this example does not migrate o
 remove any installation's data.
 
 Set `dataset_dir` to a directory relative to the mount selected by `dataset`,
-or to an absolute host path below the corresponding mount or `/mnt/sdb/datasets`.
+or to an absolute host path below the corresponding mount, `/mnt/sdb/datasets`,
+or `/home/eisoc/data/debug_datapilot` (`~` is not expanded).
 The workflow defaults to TempSeg GPU inference on all parts in the supplied UMI
 directory. With `dagger` and `tempseg`, it reads Parquet directly in bounded parts without preparing AVI
 files, reuses one model session, and prefetches at most one part across episodes on a reader thread. Set `inference`
 to `false` for CPU validation only, select `dagger`, or set `max_parts` to a
 positive value to limit the number of parts. Outputs are stored under
-`<dataset_root>/tempseg/<execution-id>/`, including `manifest.json`. GPU runs
+`<dataset_root>/temp_seg/runs/<execution-id>/validation/` and `inference/`, including
+`manifest.json`. Every execution completes a separate full CPU preflight before
+optional GPU inference. TempSeg defaults to `include_flags=true`; optional
+`dataset_key` and `episodes` select its identity and episode inventory. Only complete
+results with matching preflight identity and full frame coverage are handed off and
+atomically copied to `<dataset_root>/temp_seg/results.json`. A bounded partial run
+fails publication and leaves the previous successful canonical file intact. GPU runs
 require a suitable GPU and an approved model cache.
 
 ## Model selection
@@ -94,9 +102,13 @@ Without `--run`, only input validation is performed.
 
 In Kestra, select `model_mode` and set `inference=true`. For `captioner`, set
 `segments_execution_id` to a previous successful TempSeg execution for the
-same dataset and parts. Results are stored under `<dataset_root>/tempseg/<execution-id>/`.
-Build the existing Flora image with `docker compose build` on the engine host
-when changing its code. Use the repository's normal image distribution procedure
+same dataset and parts. Results are stored under
+`<dataset_root>/temp_seg/runs/<execution-id>/inference/`. Captioner prefers this
+layout and falls back to the old `tempseg/<execution-id>/` layout for historical runs.
+Build the current Flora image on the engine host when changing its code, then
+supply its full image ID or repository digest as `flora_image`. The workflow uses
+offline model loading and disables container networking; prepare all model assets
+first. The writable model-cache mount permits Hugging Face lock files. Use the repository's normal image distribution procedure
 for another host; no separate nested image store is involved.
 
 GPU inference still requires approval before downloading weights to a new disk.
@@ -162,3 +174,73 @@ part with episode-relative frame and time offsets; the manifest is written after
 completion. Use `--resume --run --output <same-directory>` to reuse matching
 completed parts. Resume is not supported with custom merged weights. Other
 adapter modes keep their existing video preparation behavior.
+
+## Native aggregate results (`flora_results_v1`)
+
+`python -m src.infer --mode tempseg` now also writes `<output>/results.json`,
+for direct Parquet, DAgger video preparation and UMI. Add `--dataset-key ID`
+to echo the caller's dataset identifier; the default is the directory name.
+This identifier does not prove ownership or source identity. Use `--episodes 9 19 29`
+to select multiple, possibly nonconsecutive episodes in one aggregate. It is mutually
+exclusive with `--episode`; missing or duplicate indices are rejected. Other model modes
+retain their existing output interfaces.
+
+```bash
+# CPU validation; no model downloads or GPU inference.
+python -m src.infer --kind dagger --mode tempseg --direct-parquet \
+  --dataset /data/example --dataset-key example --episode 0 \
+  --output /outputs/check-001
+# After validation, use an independent output directory and approved resources.
+python -m src.infer --kind dagger --mode tempseg --direct-parquet \
+  --dataset /data/example --dataset-key example --episode 0 \
+  --include-flags --run --output /outputs/run-001
+```
+
+The structural contract is [results.schema.json](results.schema.json).
+Consumers read `results[dataset_key][chunk][episode_index]`. Each selected episode
+is listed before processing, including those not reached by `--max-parts`.
+`processed_ranges` describes successful model execution, independently of detected
+segments. `complete` requires every selected episode to have full frame coverage;
+empty detection can still be successful. Bounded runs can exit normally with
+`partial` or `not_processed` results. CPU validation produces `validated` only for
+fully checked episodes, empty segments/ranges and `complete=false`; an episode
+only partly checked remains `not_processed`. Execution errors exit nonzero and,
+when sufficient input identity is available, write a diagnostic `complete=false`
+file with sanitized errors. Cancellation does not guarantee a result file.
+
+Frames are original zero-based episode row indices with exclusive end bounds.
+Seconds are relative to the first source presentation timestamp. The declared
+`flora_frame_span_v1` rule retains Flora's covering-frame start and exclusive end;
+concurrent overlapping segments remain separate. Optional flags use
+`episode_boundaries_v1`: filter and merge boundaries across the whole episode,
+not separately per part. Existing per-part flags keep their previous semantics.
+
+UMI additionally requires its original Parquet from `meta/info.json`'s `data_path`.
+Rows must have contiguous `frame_index`, matching `episode_index`, and a strictly
+increasing `timestamp` (or `relative_timestamp_sec` when `timestamp` is absent).
+Normalized row timestamps must match video PTS within one microsecond. Unsupported
+clock mappings fail rather than falling back to FPS arithmetic. The DAgger AVI
+path must pass the same clock check against its source rows; irregular DAgger
+clocks should use `--direct-parquet` to retain native timestamps.
+
+Source files and metadata use streamed SHA-256 digests and root-relative paths;
+paths escaping the dataset are rejected. The producer revision is a content
+SHA-256 of the adapter and annotation code, including pinned manifest/configuration.
+Custom merged checkpoints are identified by a digest of their sorted relative
+file names and SHA-256 digests, without claiming the default model revision.
+Sources, code and model identity are checked again before publishing the file.
+Results do not contain platform run IDs, credentials or absolute dataset paths.
+
+Each attempt should have a separate writable output directory and read-only source
+mount. Direct resume additionally requires the matching `results.identity.json`
+written before execution, including all effective parameters and the full selected
+source inventory. Old runs without this identity cannot be resumed under the new
+contract. Resume removes the previous aggregate and rebuilds it from checked
+per-part results; it cannot extend a run by changing `--max-parts`. Custom-weight
+resume remains unsupported. Existing Captioner per-part reuse is preserved.
+
+The aggregate is strict JSON, fsynced and atomically renamed in the output
+directory. Files over 8 MiB fail explicitly; select fewer episodes instead of
+truncating results. The final stdout line reports its path and `complete` value.
+DataPilot ingestion, generic runner management and publication remain platform work;
+this file alone does not authorize publication.
